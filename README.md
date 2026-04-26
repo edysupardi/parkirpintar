@@ -12,16 +12,17 @@
 3. [Capacity Planning](#3-capacity-planning)
 4. [High Level Architecture](#4-high-level-architecture-hld)
 5. [Low Level Architecture](#5-low-level-architecture-lld)
-6. [ERD](#6-erd--entity-relationship-diagram)
-7. [Technology Decisions](#7-technology-decisions--justifications)
-8. [AWS Infrastructure](#8-aws-infrastructure)
-9. [Deployment Strategy](#9-deployment-strategy)
-10. [CI/CD Pipeline](#10-cicd-pipeline)
-11. [Observability](#11-observability)
-12. [Business Rules Reference](#12-business-rules-reference)
-13. [Testing Strategy](#13-testing-strategy)
-14. [Third-Party Libraries](#14-third-party-libraries--tools)
-15. [How to Run](#15-how-to-run)
+6. [Architecture Pattern](#6-architecture-pattern)
+7. [ERD](#7-erd--entity-relationship-diagram)
+8. [Technology Decisions](#8-technology-decisions--justifications)
+9. [AWS Infrastructure](#9-aws-infrastructure)
+10. [Deployment Strategy](#10-deployment-strategy)
+11. [CI/CD Pipeline](#11-cicd-pipeline)
+12. [Observability](#12-observability)
+13. [Business Rules Reference](#13-business-rules-reference)
+14. [Testing Strategy](#14-testing-strategy)
+15. [Third-Party Libraries](#15-third-party-libraries--tools)
+16. [How to Run](#16-how-to-run)
 
 ---
 
@@ -322,7 +323,44 @@ Park 23:00 – 01:00:
 
 ---
 
-## 6. ERD - Entity Relationship Diagram
+## 6. Architecture Pattern
+
+Setiap microservice menggunakan **Layered Architecture** dengan dependency flow yang ketat:
+
+```
+handler/ → usecase/ → repository/
+```
+
+| Layer | Lokasi | Tanggung Jawab |
+|-------|--------|----------------|
+| `handler/` | `internal/handler/` | Terima gRPC request, validasi input, translate proto ↔ domain |
+| `usecase/` | `internal/usecase/` | Business logic dan orchestration — tidak tau detail DB atau gRPC |
+| `repository/` | `internal/repository/` | Data access layer — query PostgreSQL dan Redis |
+| `domain/` | `internal/domain/` | Struct definitions dan interfaces — zero external dependency |
+| `subscriber/` | `internal/subscriber/` | RabbitMQ event consumer — panggil usecase saat terima event |
+
+**Aturan dependency:**
+- `handler` boleh panggil `usecase`, tidak boleh langsung query DB
+- `usecase` boleh panggil `repository`, tidak boleh tau HTTP/gRPC detail
+- `repository` hanya urusan data — tidak ada business logic
+- `domain` tidak boleh import package manapun dari project ini
+
+**Struktur per service:**
+```
+services/{name}/
+├── cmd/main.go              ← entry point, wire semua dependency
+├── internal/
+│   ├── domain/              ← struct + interfaces (zero deps)
+│   ├── handler/             ← gRPC handler
+│   ├── usecase/             ← business logic
+│   ├── repository/          ← data access
+│   └── subscriber/          ← MQ event consumer
+└── Dockerfile
+```
+
+---
+
+## 7. ERD - Entity Relationship Diagram
 
 > Detail ERD: [DB-Diagram](https://dbdiagram.io/d/ParkirPintar-69ecb794c6a36f9c1b7b1899)
 
@@ -340,7 +378,7 @@ notif_logs  parking_sessions
 
 ---
 
-## 7. Technology Decisions & Justifications
+## 8. Technology Decisions & Justifications
 
 | Komponen | Pilihan | Alternatif | Alasan |
 |----------|---------|------------|--------|
@@ -355,7 +393,7 @@ notif_logs  parking_sessions
 
 ---
 
-## 8. AWS Infrastructure
+## 9. AWS Infrastructure
 
 ### Services
 
@@ -407,14 +445,14 @@ terraform/
 
 ---
 
-## 9. Deployment Strategy
+## 10. Deployment Strategy
 
-| Environment | Strategy | Alasan |
-|-------------|----------|--------|
-| Development | Recreate | Speed lebih penting dari availability |
-| Staging | Rolling Update | Mirror production behavior |
-| Production (app) | Canary | Validasi gradual - 10% → 50% → 100% |
-| Production (infra) | Blue/Green | Rollback instant untuk perubahan besar |
+| Environment | Strategy | Alasan | Trade-off |
+|-------------|----------|--------|-----------|
+| Development | Recreate | Clean state setiap deploy menyederhanakan debugging | Downtime ~10 detik saat deploy |
+| Staging | Rolling Update | Mirror production behavior, zero downtime | Dua versi bisa berjalan bersamaan sebentar — acceptable di staging |
+| Production (app) | Canary | Validasi gradual sebelum full rollout, rollback cepat jika ada issue | Butuh monitoring yang proper, sedikit lebih lambat rollout |
+| Production (infra) | Blue/Green | Rollback instant untuk perubahan besar seperti DB migration atau config change | 2x infrastructure cost sementara selama cutover |
 
 ### Canary Flow
 
@@ -429,7 +467,7 @@ Deploy v2 ke 50% → Monitor → 100%
 
 ---
 
-## 10. CI/CD Pipeline
+## 11. CI/CD Pipeline
 
 ```
 feature branch push
@@ -452,7 +490,7 @@ Path-based trigger: hanya service yang berubah yang di-build ulang.
 
 ---
 
-## 11. Observability
+## 12. Observability
 
 ### The 4 Golden Signals
 
@@ -475,7 +513,7 @@ Path-based trigger: hanya service yang berubah yang di-build ulang.
 
 ---
 
-## 12. Business Rules Reference
+## 13. Business Rules Reference
 
 ### Pricing
 
@@ -505,7 +543,7 @@ Path-based trigger: hanya service yang berubah yang di-build ulang.
 
 ---
 
-## 13. Testing Strategy
+## 14. Testing Strategy
 
 ### Unit Tests - `pkg/`
 
@@ -562,7 +600,7 @@ Event publishing dan consuming via RabbitMQ
 
 ---
 
-## 14. Third-Party Libraries & Tools
+## 15. Third-Party Libraries & Tools
 
 | Library | Fungsi | Justifikasi |
 |---------|--------|-------------|
@@ -586,7 +624,7 @@ Event publishing dan consuming via RabbitMQ
 
 ---
 
-## 15. How to Run
+## 16. How to Run
 
 ### Prerequisites
 
