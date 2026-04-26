@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package gateway.v1;
 
-option go_package = "github.com/org/parkirpintar/gen/gateway/v1;gatewayv1";
+option go_package = "github.com/edysupardi/parkirpintar/gen/gateway/v1;gatewayv1";
 
 import "google/protobuf/timestamp.proto";
 import "common/v1/common.proto";

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package reservation.v1;
 
-option go_package = "github.com/org/parkirpintar/gen/reservation/v1;reservationv1";
+option go_package = "github.com/edysupardi/parkirpintar/gen/reservation/v1;reservationv1";
 
 import "google/protobuf/timestamp.proto";
 import "common/v1/common.proto";

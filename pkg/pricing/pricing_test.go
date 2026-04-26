@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/org/parkirpintar/pkg/pricing"
+	"github.com/edysupardi/parkirpintar/pkg/pricing"
 )
 
 // TODO: implement all test cases

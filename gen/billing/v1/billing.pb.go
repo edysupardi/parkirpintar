@@ -7,7 +7,7 @@
 package billingv1
 
 import (
-	v1 "github.com/org/parkirpintar/gen/common/v1"
+	v1 "github.com/edysupardi/parkirpintar/gen/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -1013,7 +1013,7 @@ const file_billing_v1_billing_proto_rawDesc = "" +
 	"\x13GetInvoiceBySession\x12&.billing.v1.GetInvoiceBySessionRequest\x1a'.billing.v1.GetInvoiceBySessionResponse\x12W\n" +
 	"\x0ePreviewBilling\x12!.billing.v1.PreviewBillingRequest\x1a\".billing.v1.PreviewBillingResponse\x12u\n" +
 	"\x18CalculateCancellationFee\x12+.billing.v1.CalculateCancellationFeeRequest\x1a,.billing.v1.CalculateCancellationFeeResponse\x12Z\n" +
-	"\x0fMarkInvoicePaid\x12\".billing.v1.MarkInvoicePaidRequest\x1a#.billing.v1.MarkInvoicePaidResponseB6Z4github.com/org/parkirpintar/gen/billing/v1;billingv1b\x06proto3"
+	"\x0fMarkInvoicePaid\x12\".billing.v1.MarkInvoicePaidRequest\x1a#.billing.v1.MarkInvoicePaidResponseB=Z;github.com/edysupardi/parkirpintar/gen/billing/v1;billingv1b\x06proto3"
 
 var (
 	file_billing_v1_billing_proto_rawDescOnce sync.Once

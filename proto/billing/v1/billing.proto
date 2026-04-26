@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package billing.v1;
 
-option go_package = "github.com/org/parkirpintar/gen/billing/v1;billingv1";
+option go_package = "github.com/edysupardi/parkirpintar/gen/billing/v1;billingv1";
 
 import "google/protobuf/timestamp.proto";
 import "common/v1/common.proto";

@@ -7,7 +7,7 @@
 package reservationv1
 
 import (
-	v1 "github.com/org/parkirpintar/gen/common/v1"
+	v1 "github.com/edysupardi/parkirpintar/gen/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -1296,7 +1296,7 @@ const file_reservation_v1_reservation_proto_rawDesc = "" +
 	"\aCheckIn\x12\x1e.reservation.v1.CheckInRequest\x1a\x1f.reservation.v1.CheckInResponse\x12M\n" +
 	"\bCheckOut\x12\x1f.reservation.v1.CheckOutRequest\x1a .reservation.v1.CheckOutResponse\x12b\n" +
 	"\x0fGetAvailability\x12&.reservation.v1.GetAvailabilityRequest\x1a'.reservation.v1.GetAvailabilityResponse\x12k\n" +
-	"\x12ListAvailableSpots\x12).reservation.v1.ListAvailableSpotsRequest\x1a*.reservation.v1.ListAvailableSpotsResponseB>Z<github.com/org/parkirpintar/gen/reservation/v1;reservationv1b\x06proto3"
+	"\x12ListAvailableSpots\x12).reservation.v1.ListAvailableSpotsRequest\x1a*.reservation.v1.ListAvailableSpotsResponseBEZCgithub.com/edysupardi/parkirpintar/gen/reservation/v1;reservationv1b\x06proto3"
 
 var (
 	file_reservation_v1_reservation_proto_rawDescOnce sync.Once

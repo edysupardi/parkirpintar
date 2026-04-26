@@ -7,7 +7,7 @@
 package presencev1
 
 import (
-	v1 "github.com/org/parkirpintar/gen/common/v1"
+	v1 "github.com/edysupardi/parkirpintar/gen/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -634,7 +634,7 @@ const file_presence_v1_presence_proto_rawDesc = "" +
 	"\x0fPresenceService\x12]\n" +
 	"\x0eStreamLocation\x12\".presence.v1.StreamLocationRequest\x1a#.presence.v1.StreamLocationResponse(\x010\x01\x12\\\n" +
 	"\x0fGetLastLocation\x12#.presence.v1.GetLastLocationRequest\x1a$.presence.v1.GetLastLocationResponse\x12V\n" +
-	"\rCheckGeofence\x12!.presence.v1.CheckGeofenceRequest\x1a\".presence.v1.CheckGeofenceResponseB8Z6github.com/org/parkirpintar/gen/presence/v1;presencev1b\x06proto3"
+	"\rCheckGeofence\x12!.presence.v1.CheckGeofenceRequest\x1a\".presence.v1.CheckGeofenceResponseB?Z=github.com/edysupardi/parkirpintar/gen/presence/v1;presencev1b\x06proto3"
 
 var (
 	file_presence_v1_presence_proto_rawDescOnce sync.Once

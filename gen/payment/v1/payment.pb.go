@@ -7,7 +7,7 @@
 package paymentv1
 
 import (
-	v1 "github.com/org/parkirpintar/gen/common/v1"
+	v1 "github.com/edysupardi/parkirpintar/gen/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -838,7 +838,7 @@ const file_payment_v1_payment_proto_rawDesc = "" +
 	"\x11CreateTransaction\x12$.payment.v1.CreateTransactionRequest\x1a%.payment.v1.CreateTransactionResponse\x12i\n" +
 	"\x14GetTransactionStatus\x12'.payment.v1.GetTransactionStatusRequest\x1a(.payment.v1.GetTransactionStatusResponse\x12T\n" +
 	"\rHandleWebhook\x12 .payment.v1.HandleWebhookRequest\x1a!.payment.v1.HandleWebhookResponse\x12l\n" +
-	"\x15ListPaymentsByInvoice\x12(.payment.v1.ListPaymentsByInvoiceRequest\x1a).payment.v1.ListPaymentsByInvoiceResponseB6Z4github.com/org/parkirpintar/gen/payment/v1;paymentv1b\x06proto3"
+	"\x15ListPaymentsByInvoice\x12(.payment.v1.ListPaymentsByInvoiceRequest\x1a).payment.v1.ListPaymentsByInvoiceResponseB=Z;github.com/edysupardi/parkirpintar/gen/payment/v1;paymentv1b\x06proto3"
 
 var (
 	file_payment_v1_payment_proto_rawDescOnce sync.Once

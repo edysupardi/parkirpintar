@@ -749,7 +749,7 @@ const file_notification_v1_notification_proto_rawDesc = "" +
 	"\x13NotificationService\x12g\n" +
 	"\x10SendNotification\x12(.notification.v1.SendNotificationRequest\x1a).notification.v1.SendNotificationResponse\x12v\n" +
 	"\x15BroadcastNotification\x12-.notification.v1.BroadcastNotificationRequest\x1a..notification.v1.BroadcastNotificationResponse\x12y\n" +
-	"\x16GetNotificationHistory\x12..notification.v1.GetNotificationHistoryRequest\x1a/.notification.v1.GetNotificationHistoryResponseB@Z>github.com/org/parkirpintar/gen/notification/v1;notificationv1b\x06proto3"
+	"\x16GetNotificationHistory\x12..notification.v1.GetNotificationHistoryRequest\x1a/.notification.v1.GetNotificationHistoryResponseBGZEgithub.com/edysupardi/parkirpintar/gen/notification/v1;notificationv1b\x06proto3"
 
 var (
 	file_notification_v1_notification_proto_rawDescOnce sync.Once

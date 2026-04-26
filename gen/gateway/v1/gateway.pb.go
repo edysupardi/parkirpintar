@@ -7,7 +7,7 @@
 package gatewayv1
 
 import (
-	v1 "github.com/org/parkirpintar/gen/common/v1"
+	v1 "github.com/edysupardi/parkirpintar/gen/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -1847,7 +1847,7 @@ const file_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x0ePreviewBilling\x12!.gateway.v1.PreviewBillingRequest\x1a\".gateway.v1.PreviewBillingResponse\x12T\n" +
 	"\rCreatePayment\x12 .gateway.v1.CreatePaymentRequest\x1a!.gateway.v1.CreatePaymentResponse\x12]\n" +
 	"\x10GetPaymentStatus\x12#.gateway.v1.GetPaymentStatusRequest\x1a$.gateway.v1.GetPaymentStatusResponse\x12a\n" +
-	"\x10StreamMyLocation\x12#.gateway.v1.StreamMyLocationRequest\x1a$.gateway.v1.StreamMyLocationResponse(\x010\x01B6Z4github.com/org/parkirpintar/gen/gateway/v1;gatewayv1b\x06proto3"
+	"\x10StreamMyLocation\x12#.gateway.v1.StreamMyLocationRequest\x1a$.gateway.v1.StreamMyLocationResponse(\x010\x01B=Z;github.com/edysupardi/parkirpintar/gen/gateway/v1;gatewayv1b\x06proto3"
 
 var (
 	file_gateway_v1_gateway_proto_rawDescOnce sync.Once

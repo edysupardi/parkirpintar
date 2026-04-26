@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package notification.v1;
 
-option go_package = "github.com/org/parkirpintar/gen/notification/v1;notificationv1";
+option go_package = "github.com/edysupardi/parkirpintar/gen/notification/v1;notificationv1";
 
 import "google/protobuf/timestamp.proto";
 
