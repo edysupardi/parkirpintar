@@ -3,3 +3,6 @@
 .env.local
 .env.*.local
 .envrc
+
+# another docs
+docs/
