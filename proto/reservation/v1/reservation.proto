@@ -1,0 +1,211 @@
+syntax = "proto3";
+
+package reservation.v1;
+
+option go_package = "github.com/org/parkirpintar/gen/reservation/v1;reservationv1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+// ─────────────────────────────────────────
+// Service Definition
+// ─────────────────────────────────────────
+
+service ReservationService {
+  // Driver buat reservasi baru
+  // Idempotent: request dengan idempotency_key sama akan return response yang sama
+  rpc CreateReservation(CreateReservationRequest)
+      returns (CreateReservationResponse);
+
+  // Driver batalkan reservasi
+  // Berlaku sebelum check-in. Fee tergantung waktu cancellation.
+  rpc CancelReservation(CancelReservationRequest)
+      returns (CancelReservationResponse);
+
+  // Ambil detail reservasi
+  rpc GetReservation(GetReservationRequest)
+      returns (GetReservationResponse);
+
+  // Ambil reservasi aktif milik driver
+  rpc GetActiveReservation(GetActiveReservationRequest)
+      returns (GetActiveReservationResponse);
+
+  // Trigger check-in (dipanggil oleh Presence Service via event,
+  // atau manual oleh driver)
+  rpc CheckIn(CheckInRequest)
+      returns (CheckInResponse);
+
+  // Trigger check-out (dipanggil oleh driver saat selesai parkir)
+  rpc CheckOut(CheckOutRequest)
+      returns (CheckOutResponse);
+
+  // Ambil ketersediaan spot (dipanggil Gateway untuk tampilkan ke driver)
+  rpc GetAvailability(GetAvailabilityRequest)
+      returns (GetAvailabilityResponse);
+
+  // List spot untuk user-selected mode
+  rpc ListAvailableSpots(ListAvailableSpotsRequest)
+      returns (ListAvailableSpotsResponse);
+}
+
+// ─────────────────────────────────────────
+// CreateReservation
+// ─────────────────────────────────────────
+
+message CreateReservationRequest {
+  string                   driver_id       = 1;
+  common.v1.VehicleType    vehicle_type    = 2;
+  common.v1.AssignmentMode assignment_mode = 3;
+
+  // Hanya diisi kalau assignment_mode = USER_SELECTED
+  // Kalau SYSTEM, field ini diabaikan
+  string spot_id = 4;
+
+  // Wajib diisi oleh client untuk idempotency
+  // Format: UUID v4
+  string idempotency_key = 5;
+}
+
+message CreateReservationResponse {
+  string                        reservation_id = 1;
+  common.v1.Spot                spot           = 2;
+  common.v1.ReservationStatus   status         = 3;
+  google.protobuf.Timestamp     confirmed_at   = 4;
+  google.protobuf.Timestamp     expires_at     = 5;  // confirmed_at + 1 jam
+  common.v1.Money               booking_fee    = 6;  // selalu 5.000 IDR
+}
+
+// ─────────────────────────────────────────
+// CancelReservation
+// ─────────────────────────────────────────
+
+message CancelReservationRequest {
+  string reservation_id = 1;
+  string driver_id      = 2;  // untuk validasi ownership
+}
+
+message CancelReservationResponse {
+  string                      reservation_id   = 1;
+  common.v1.ReservationStatus status           = 2;  // CANCELLED
+  common.v1.Money             cancellation_fee = 3;  // 0 atau 5.000 IDR
+  string                      fee_reason       = 4;  // penjelasan kenapa fee segitu
+  google.protobuf.Timestamp   cancelled_at     = 5;
+}
+
+// ─────────────────────────────────────────
+// GetReservation
+// ─────────────────────────────────────────
+
+message GetReservationRequest {
+  string reservation_id = 1;
+}
+
+message GetReservationResponse {
+  Reservation reservation = 1;
+}
+
+// ─────────────────────────────────────────
+// GetActiveReservation
+// ─────────────────────────────────────────
+
+message GetActiveReservationRequest {
+  string driver_id = 1;
+}
+
+message GetActiveReservationResponse {
+  // null kalau tidak ada active reservation
+  Reservation reservation = 1;
+  bool        has_active  = 2;
+}
+
+// ─────────────────────────────────────────
+// CheckIn
+// ─────────────────────────────────────────
+
+message CheckInRequest {
+  string             reservation_id = 1;
+  string             driver_id      = 2;
+  common.v1.Spot     actual_spot    = 3;  // spot yang beneran dipakai driver
+  common.v1.Coordinate location     = 4;
+}
+
+message CheckInResponse {
+  string                    reservation_id  = 1;
+  string                    session_id      = 2;
+  common.v1.ReservationStatus status        = 3;  // ACTIVE
+  google.protobuf.Timestamp check_in_at     = 4;
+  bool                      wrong_spot      = 5;  // true kalau actual_spot != reserved_spot
+  common.v1.Money           wrong_spot_penalty = 6;  // 200.000 IDR kalau wrong_spot = true
+}
+
+// ─────────────────────────────────────────
+// CheckOut
+// ─────────────────────────────────────────
+
+message CheckOutRequest {
+  string reservation_id  = 1;
+  string driver_id       = 2;
+  string idempotency_key = 3;  // idempotent: double checkout tidak double-invoice
+}
+
+message CheckOutResponse {
+  string                    reservation_id = 1;
+  string                    session_id     = 2;
+  string                    invoice_id     = 3;
+  common.v1.ReservationStatus status       = 4;  // COMPLETED
+  google.protobuf.Timestamp check_out_at   = 5;
+  int64                     duration_minutes = 6;
+}
+
+// ─────────────────────────────────────────
+// GetAvailability
+// ─────────────────────────────────────────
+
+message GetAvailabilityRequest {
+  common.v1.VehicleType vehicle_type = 1;
+}
+
+message GetAvailabilityResponse {
+  common.v1.VehicleType vehicle_type     = 1;
+  int32                 total_capacity   = 2;
+  int32                 available_spots  = 3;
+  int32                 occupied_spots   = 4;
+  int32                 reserved_spots   = 5;
+  bool                  is_available     = 6;  // available_spots > 0
+}
+
+// ─────────────────────────────────────────
+// ListAvailableSpots (untuk user-selected mode)
+// ─────────────────────────────────────────
+
+message ListAvailableSpotsRequest {
+  common.v1.VehicleType vehicle_type = 1;
+  int32                 floor        = 2;  // 0 = semua lantai
+}
+
+message ListAvailableSpotsResponse {
+  repeated SpotAvailability spots = 1;
+}
+
+message SpotAvailability {
+  common.v1.Spot spot      = 1;
+  bool           available = 2;
+  // kalau tidak available, kapan kira-kira akan tersedia (estimasi)
+  google.protobuf.Timestamp estimated_available_at = 3;
+}
+
+// ─────────────────────────────────────────
+// Shared Message: Reservation
+// ─────────────────────────────────────────
+
+message Reservation {
+  string                       reservation_id  = 1;
+  string                       driver_id       = 2;
+  common.v1.Spot               spot            = 3;
+  common.v1.ReservationStatus  status          = 4;
+  common.v1.AssignmentMode     assignment_mode = 5;
+  google.protobuf.Timestamp    confirmed_at    = 6;
+  google.protobuf.Timestamp    expires_at      = 7;
+  google.protobuf.Timestamp    cancelled_at    = 8;
+  string                       session_id      = 9;  // diisi setelah check-in
+}

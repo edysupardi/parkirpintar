@@ -1,12 +1,11 @@
 version: v1
-name: buf.build/org/parkirpintar
-deps:
-  - buf.build/googleapis/googleapis
+name: buf.build/edysupardi/parkirpintar
+deps: []
 breaking:
   use:
     - FILE
 lint:
   use:
-    - DEFAULT
+    - STANDARD
   except:
     - PACKAGE_VERSION_SUFFIX

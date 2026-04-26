@@ -1,0 +1,262 @@
+syntax = "proto3";
+
+package gateway.v1;
+
+option go_package = "github.com/org/parkirpintar/gen/gateway/v1;gatewayv1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+// ─────────────────────────────────────────────────────────────
+// Gateway Service
+//
+// Gateway adalah satu-satunya entry point dari mobile app.
+// Service ini:
+//   1. Validasi JWT token
+//   2. Rate limiting
+//   3. Translate REST ↔ gRPC
+//   4. Aggregate response dari multiple services kalau perlu
+//
+// Catatan: Gateway tidak punya business logic.
+// Semua business logic ada di downstream services.
+// ─────────────────────────────────────────────────────────────
+
+service GatewayService {
+
+  // ── Parking Area ──────────────────────────────────────
+  // Cek ketersediaan spot (sebelum reserve)
+  rpc GetParkingAvailability(GetParkingAvailabilityRequest)
+      returns (GetParkingAvailabilityResponse);
+
+  // ── Reservation ───────────────────────────────────────
+  rpc CreateReservation(CreateReservationRequest)
+      returns (CreateReservationResponse);
+
+  rpc GetMyReservation(GetMyReservationRequest)
+      returns (GetMyReservationResponse);
+
+  rpc CancelReservation(CancelReservationRequest)
+      returns (CancelReservationResponse);
+
+  rpc CheckIn(CheckInRequest)
+      returns (CheckInResponse);
+
+  rpc CheckOut(CheckOutRequest)
+      returns (CheckOutResponse);
+
+  // ── Billing ───────────────────────────────────────────
+  rpc GetInvoice(GetInvoiceRequest)
+      returns (GetInvoiceResponse);
+
+  rpc PreviewBilling(PreviewBillingRequest)
+      returns (PreviewBillingResponse);
+
+  // ── Payment ───────────────────────────────────────────
+  rpc CreatePayment(CreatePaymentRequest)
+      returns (CreatePaymentResponse);
+
+  rpc GetPaymentStatus(GetPaymentStatusRequest)
+      returns (GetPaymentStatusResponse);
+
+  // ── Presence ──────────────────────────────────────────
+  // Streaming lokasi dari mobile app
+  rpc StreamMyLocation(stream StreamMyLocationRequest)
+      returns (stream StreamMyLocationResponse);
+}
+
+// ─────────────────────────────────────────
+// Parking Area
+// ─────────────────────────────────────────
+
+message GetParkingAvailabilityRequest {
+  common.v1.VehicleType vehicle_type = 1;
+}
+
+message GetParkingAvailabilityResponse {
+  common.v1.VehicleType vehicle_type    = 1;
+  int32                 total_capacity  = 2;
+  int32                 available_spots = 3;
+  bool                  is_available    = 4;
+
+  // Summary per lantai untuk user-selected mode
+  repeated FloorSummary floors = 5;
+}
+
+message FloorSummary {
+  int32 floor           = 1;
+  int32 available_spots = 2;
+  int32 total_spots     = 3;
+}
+
+// ─────────────────────────────────────────
+// Reservation via Gateway
+// ─────────────────────────────────────────
+
+message CreateReservationRequest {
+  // driver_id di-inject dari JWT — tidak perlu dikirim client
+  common.v1.VehicleType    vehicle_type    = 1;
+  common.v1.AssignmentMode assignment_mode = 2;
+  string                   spot_id         = 3;  // opsional, kalau user-selected
+  string                   idempotency_key = 4;
+}
+
+message CreateReservationResponse {
+  string                      reservation_id = 1;
+  common.v1.Spot              spot           = 2;
+  common.v1.ReservationStatus status         = 3;
+  google.protobuf.Timestamp   confirmed_at   = 4;
+  google.protobuf.Timestamp   expires_at     = 5;
+  common.v1.Money             booking_fee    = 6;
+  SpotNavigation navigation = 7;
+}
+
+message SpotNavigation {
+  int32  floor        = 1;
+  int32  spot_number  = 2;
+  string direction    = 3;
+}
+
+message GetMyReservationRequest {
+  // driver_id dari JWT
+}
+
+message GetMyReservationResponse {
+  bool        has_active_reservation = 1;
+  Reservation reservation            = 2;
+}
+
+message CancelReservationRequest {
+  string reservation_id = 1;
+}
+
+message CancelReservationResponse {
+  string                      reservation_id   = 1;
+  common.v1.ReservationStatus status           = 2;
+  common.v1.Money             cancellation_fee = 3;
+  string                      fee_reason       = 4;
+}
+
+message CheckInRequest {
+  string               reservation_id = 1;
+  common.v1.Coordinate coordinate     = 2;
+  string               actual_spot_id = 3;
+}
+
+message CheckInResponse {
+  string                      reservation_id     = 1;
+  string                      session_id         = 2;
+  common.v1.ReservationStatus status             = 3;
+  google.protobuf.Timestamp   check_in_at        = 4;
+  bool                        wrong_spot         = 5;
+  common.v1.Money             wrong_spot_penalty = 6;
+}
+
+message CheckOutRequest {
+  string reservation_id  = 1;
+  string idempotency_key = 2;
+}
+
+message CheckOutResponse {
+  string                    session_id       = 1;
+  string                    invoice_id       = 2;
+  google.protobuf.Timestamp check_out_at     = 3;
+  int64                     duration_minutes = 4;
+  InvoiceSummary            invoice_summary  = 5;
+}
+
+// ─────────────────────────────────────────
+// Billing via Gateway
+// ─────────────────────────────────────────
+
+message GetInvoiceRequest {
+  string invoice_id = 1;
+}
+
+message GetInvoiceResponse {
+  InvoiceSummary invoice = 1;
+}
+
+message PreviewBillingRequest {
+  string session_id = 1;
+}
+
+message PreviewBillingResponse {
+  InvoiceSummary estimated = 1;
+  string         note      = 2;
+}
+
+message InvoiceSummary {
+  string          invoice_id   = 1;
+  common.v1.Money booking_fee  = 2;
+  common.v1.Money parking_fee  = 3;
+  common.v1.Money overnight_fee = 4;
+  common.v1.Money penalty_fee  = 5;
+  common.v1.Money total_amount = 6;
+  string          status       = 7;
+  int32           billed_hours = 8;
+}
+
+// ─────────────────────────────────────────
+// Payment via Gateway
+// ─────────────────────────────────────────
+
+message CreatePaymentRequest {
+  string                   invoice_id      = 1;
+  common.v1.PaymentMethod  payment_method  = 2;
+  string                   idempotency_key = 3;
+}
+
+message CreatePaymentResponse {
+  string                    transaction_id = 1;
+  common.v1.PaymentMethod   payment_method = 2;
+  string                    payment_url    = 3;
+  string                    qr_string      = 4;
+  string                    va_number      = 5;
+  string                    va_bank        = 6;
+  google.protobuf.Timestamp expired_at     = 7;
+}
+
+message GetPaymentStatusRequest {
+  string transaction_id = 1;
+}
+
+message GetPaymentStatusResponse {
+  string                    transaction_id = 1;
+  string                    status         = 2;
+  common.v1.Money           amount         = 3;
+  google.protobuf.Timestamp paid_at        = 4;
+}
+
+// ─────────────────────────────────────────
+// Presence via Gateway (streaming)
+// ─────────────────────────────────────────
+
+message StreamMyLocationRequest {
+  // driver_id dari JWT — tidak perlu dikirim ulang
+  string               session_id     = 1;
+  string               reservation_id = 2;
+  common.v1.Coordinate coordinate     = 3;
+  google.protobuf.Timestamp recorded_at = 4;
+}
+
+message StreamMyLocationResponse {
+  string event_type        = 1;  // "ack", "check_in_triggered", "approaching"
+  bool   in_geofence       = 2;
+  float  distance_to_spot  = 3;
+  bool   check_in_triggered = 4;
+  string message           = 5;
+}
+
+// ─────────────────────────────────────────
+// Shared
+// ─────────────────────────────────────────
+
+message Reservation {
+  string                      reservation_id = 1;
+  common.v1.Spot              spot           = 2;
+  common.v1.ReservationStatus status         = 3;
+  google.protobuf.Timestamp   confirmed_at   = 4;
+  google.protobuf.Timestamp   expires_at     = 5;
+  google.protobuf.Timestamp   check_in_at    = 6;
+  string                      session_id     = 7;
+}

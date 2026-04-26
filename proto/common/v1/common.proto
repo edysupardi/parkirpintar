@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package common.v1;
+
+option go_package = "github.com/org/parkirpintar/gen/common/v1;commonv1";
+
+// ─────────────────────────────────────────
+// Enums — dipakai di banyak service
+// ─────────────────────────────────────────
+
+enum VehicleType {
+  VEHICLE_TYPE_UNSPECIFIED  = 0;
+  VEHICLE_TYPE_CAR          = 1;
+  VEHICLE_TYPE_MOTORCYCLE   = 2;
+}
+
+enum ReservationStatus {
+  RESERVATION_STATUS_UNSPECIFIED = 0;
+  RESERVATION_STATUS_PENDING     = 1;
+  RESERVATION_STATUS_CONFIRMED   = 2;
+  RESERVATION_STATUS_ACTIVE      = 3;  // sudah check-in
+  RESERVATION_STATUS_COMPLETED   = 4;  // sudah check-out
+  RESERVATION_STATUS_CANCELLED   = 5;
+  RESERVATION_STATUS_EXPIRED     = 6;  // no-show > 1 jam
+}
+
+enum AssignmentMode {
+  ASSIGNMENT_MODE_UNSPECIFIED    = 0;
+  ASSIGNMENT_MODE_SYSTEM         = 1;  // system pilihkan spot
+  ASSIGNMENT_MODE_USER_SELECTED  = 2;  // user pilih sendiri
+}
+
+enum PaymentMethod {
+  PAYMENT_METHOD_UNSPECIFIED    = 0;
+  PAYMENT_METHOD_QRIS           = 1;
+  PAYMENT_METHOD_GOPAY          = 2;
+  PAYMENT_METHOD_OVO            = 3;
+  PAYMENT_METHOD_DANA           = 4;
+  PAYMENT_METHOD_VA_BCA         = 5;
+  PAYMENT_METHOD_VA_BNI         = 6;
+  PAYMENT_METHOD_VA_BRI         = 7;
+  PAYMENT_METHOD_VA_MANDIRI     = 8;
+}
+
+enum InvoiceStatus {
+  INVOICE_STATUS_UNSPECIFIED      = 0;
+  INVOICE_STATUS_DRAFT            = 1;
+  INVOICE_STATUS_PENDING_PAYMENT  = 2;
+  INVOICE_STATUS_PAID             = 3;
+  INVOICE_STATUS_VOID             = 4;
+}
+
+// ─────────────────────────────────────────
+// Common Messages
+// ─────────────────────────────────────────
+
+// Spot info — dipakai di reservation dan presence
+message Spot {
+  string       spot_id      = 1;
+  int32        floor        = 2;
+  int32        number       = 3;
+  VehicleType  vehicle_type = 4;
+}
+
+// Standard error detail untuk semua service
+message ErrorDetail {
+  string code    = 1;  // e.g. "SPOT_UNAVAILABLE", "INVALID_VEHICLE_TYPE"
+  string message = 2;
+  string field   = 3;  // field yang menyebabkan error (opsional)
+}
+
+// Money — selalu dalam IDR, unit: rupiah (integer, no decimal)
+message Money {
+  int64  amount   = 1;  // dalam IDR
+  string currency = 2;  // selalu "IDR"
+}
+
+// Koordinat GPS
+message Coordinate {
+  double latitude        = 1;
+  double longitude       = 2;
+  float  accuracy_meters = 3;
+}
