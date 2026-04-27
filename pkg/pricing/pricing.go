@@ -25,26 +25,57 @@ type Result struct {
 }
 
 // Calculate computes the full billing for a parking session.
-// checkIn and checkOut are in UTC — caller responsible for timezone.
 func Calculate(checkIn, checkOut time.Time, wrongSpot bool) Result {
-	// TODO: implement
-	return Result{}
+	billed := BilledHours(checkIn, checkOut)
+	overnight := IsOvernight(checkIn, checkOut)
+
+	parkingFee := int64(billed) * HourlyRate
+	overnightFee := int64(0)
+	if overnight {
+		overnightFee = OvernightFee
+	}
+	penaltyFee := int64(0)
+	if wrongSpot {
+		penaltyFee = WrongSpotPenalty
+	}
+
+	return Result{
+		BookingFee:   BookingFee,
+		ParkingFee:   parkingFee,
+		OvernightFee: overnightFee,
+		PenaltyFee:   penaltyFee,
+		TotalAmount:  BookingFee + parkingFee + overnightFee + penaltyFee,
+		BilledHours:  billed,
+		IsOvernight:  overnight,
+	}
 }
 
 // CalculateCancellationFee returns the fee based on when driver cancels.
 func CalculateCancellationFee(confirmedAt, cancelledAt time.Time, isNoShow bool) int64 {
-	// TODO: implement
-	return 0
+	if isNoShow {
+		return NoShowFee
+	}
+	if cancelledAt.Sub(confirmedAt) <= FreeCancelWindow {
+		return CancellationFree
+	}
+	return CancellationFee
 }
 
 // IsOvernight returns true if the session crosses midnight WIB (UTC+7).
 func IsOvernight(checkIn, checkOut time.Time) bool {
-	// TODO: implement
-	return false
+	wib := time.FixedZone("WIB", 7*60*60)
+	inWIB := checkIn.In(wib)
+	outWIB := checkOut.In(wib)
+	inDate := time.Date(inWIB.Year(), inWIB.Month(), inWIB.Day(), 0, 0, 0, 0, wib)
+	outDate := time.Date(outWIB.Year(), outWIB.Month(), outWIB.Day(), 0, 0, 0, 0, wib)
+	return outDate.After(inDate)
 }
 
 // BilledHours returns the ceiling of actual duration in hours.
 func BilledHours(checkIn, checkOut time.Time) int32 {
-	// TODO: implement
-	return 0
+	mins := int64(checkOut.Sub(checkIn).Minutes())
+	if mins <= 0 {
+		return 0
+	}
+	return int32((mins + 59) / 60)
 }
