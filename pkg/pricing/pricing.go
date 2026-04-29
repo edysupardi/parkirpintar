@@ -3,29 +3,27 @@ package pricing
 import "time"
 
 const (
-	BookingFee        int64 = 5_000
-	HourlyRate        int64 = 5_000
-	OvernightFee      int64 = 20_000
-	WrongSpotPenalty  int64 = 200_000
-	CancellationFree  int64 = 0
-	CancellationFee   int64 = 5_000
-	NoShowFee         int64 = 10_000
-	FreeCancelWindow        = 2 * time.Minute
+	BookingFee       int64 = 5_000
+	HourlyRate       int64 = 5_000
+	OvernightFee     int64 = 20_000
+	CancellationFree int64 = 0
+	CancellationFee  int64 = 5_000
+	NoShowFee        int64 = 5_000
+	FreeCancelWindow       = 2 * time.Minute
 )
 
 // Result holds the complete billing breakdown
 type Result struct {
-	BookingFee    int64
-	ParkingFee    int64
-	OvernightFee  int64
-	PenaltyFee    int64
-	TotalAmount   int64
-	BilledHours   int32
-	IsOvernight   bool
+	BookingFee   int64
+	ParkingFee   int64
+	OvernightFee int64
+	TotalAmount  int64
+	BilledHours  int32
+	IsOvernight  bool
 }
 
 // Calculate computes the full billing for a parking session.
-func Calculate(checkIn, checkOut time.Time, wrongSpot bool) Result {
+func Calculate(checkIn, checkOut time.Time) Result {
 	billed := BilledHours(checkIn, checkOut)
 	overnight := IsOvernight(checkIn, checkOut)
 
@@ -34,17 +32,12 @@ func Calculate(checkIn, checkOut time.Time, wrongSpot bool) Result {
 	if overnight {
 		overnightFee = OvernightFee
 	}
-	penaltyFee := int64(0)
-	if wrongSpot {
-		penaltyFee = WrongSpotPenalty
-	}
 
 	return Result{
 		BookingFee:   BookingFee,
 		ParkingFee:   parkingFee,
 		OvernightFee: overnightFee,
-		PenaltyFee:   penaltyFee,
-		TotalAmount:  BookingFee + parkingFee + overnightFee + penaltyFee,
+		TotalAmount:  BookingFee + parkingFee + overnightFee,
 		BilledHours:  billed,
 		IsOvernight:  overnight,
 	}

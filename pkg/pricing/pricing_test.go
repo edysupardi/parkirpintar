@@ -44,19 +44,11 @@ func TestIsOvernight_SameDay(t *testing.T) {
 func TestCalculate_NormalSession(t *testing.T) {
 	checkIn  := time.Now()
 	checkOut := checkIn.Add(2 * time.Hour)
-	result   := pricing.Calculate(checkIn, checkOut, false)
+	result   := pricing.Calculate(checkIn, checkOut)
 	assert.Equal(t, int64(10_000), result.ParkingFee)
 	assert.Equal(t, int64(5_000),  result.BookingFee)
 	assert.Equal(t, int64(0),      result.OvernightFee)
-	assert.Equal(t, int64(0),      result.PenaltyFee)
 	assert.Equal(t, int64(15_000), result.TotalAmount)
-}
-
-func TestCalculate_WrongSpot(t *testing.T) {
-	checkIn  := time.Now()
-	checkOut := checkIn.Add(1 * time.Hour)
-	result   := pricing.Calculate(checkIn, checkOut, true)
-	assert.Equal(t, int64(200_000), result.PenaltyFee)
 }
 
 func TestCalculateCancellationFee_Under2Min(t *testing.T) {
@@ -74,5 +66,5 @@ func TestCalculateCancellationFee_Over2Min(t *testing.T) {
 func TestCalculateCancellationFee_NoShow(t *testing.T) {
 	confirmed := time.Now()
 	cancelled := confirmed.Add(61 * time.Minute)
-	assert.Equal(t, int64(10_000), pricing.CalculateCancellationFee(confirmed, cancelled, true))
+	assert.Equal(t, int64(5_000), pricing.CalculateCancellationFee(confirmed, cancelled, true))
 }
