@@ -569,15 +569,13 @@ func (x *CheckInRequest) GetLocation() *v1.Coordinate {
 }
 
 type CheckInResponse struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	ReservationId    string                 `protobuf:"bytes,1,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
-	SessionId        string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Status           v1.ReservationStatus   `protobuf:"varint,3,opt,name=status,proto3,enum=common.v1.ReservationStatus" json:"status,omitempty"` // ACTIVE
-	CheckInAt        *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=check_in_at,json=checkInAt,proto3" json:"check_in_at,omitempty"`
-	WrongSpot        bool                   `protobuf:"varint,5,opt,name=wrong_spot,json=wrongSpot,proto3" json:"wrong_spot,omitempty"`                       // true kalau actual_spot != reserved_spot
-	WrongSpotPenalty *v1.Money              `protobuf:"bytes,6,opt,name=wrong_spot_penalty,json=wrongSpotPenalty,proto3" json:"wrong_spot_penalty,omitempty"` // 200.000 IDR kalau wrong_spot = true
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ReservationId string                 `protobuf:"bytes,1,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Status        v1.ReservationStatus   `protobuf:"varint,3,opt,name=status,proto3,enum=common.v1.ReservationStatus" json:"status,omitempty"` // ACTIVE
+	CheckInAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=check_in_at,json=checkInAt,proto3" json:"check_in_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CheckInResponse) Reset() {
@@ -634,20 +632,6 @@ func (x *CheckInResponse) GetStatus() v1.ReservationStatus {
 func (x *CheckInResponse) GetCheckInAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CheckInAt
-	}
-	return nil
-}
-
-func (x *CheckInResponse) GetWrongSpot() bool {
-	if x != nil {
-		return x.WrongSpot
-	}
-	return false
-}
-
-func (x *CheckInResponse) GetWrongSpotPenalty() *v1.Money {
-	if x != nil {
-		return x.WrongSpotPenalty
 	}
 	return nil
 }
@@ -1234,16 +1218,13 @@ const file_reservation_v1_reservation_proto_rawDesc = "" +
 	"\tdriver_id\x18\x02 \x01(\tR\bdriverId\x120\n" +
 	"\vactual_spot\x18\x03 \x01(\v2\x0f.common.v1.SpotR\n" +
 	"actualSpot\x121\n" +
-	"\blocation\x18\x04 \x01(\v2\x15.common.v1.CoordinateR\blocation\"\xa8\x02\n" +
+	"\blocation\x18\x04 \x01(\v2\x15.common.v1.CoordinateR\blocation\"\xc9\x01\n" +
 	"\x0fCheckInResponse\x12%\n" +
 	"\x0ereservation_id\x18\x01 \x01(\tR\rreservationId\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x124\n" +
 	"\x06status\x18\x03 \x01(\x0e2\x1c.common.v1.ReservationStatusR\x06status\x12:\n" +
-	"\vcheck_in_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckInAt\x12\x1d\n" +
-	"\n" +
-	"wrong_spot\x18\x05 \x01(\bR\twrongSpot\x12>\n" +
-	"\x12wrong_spot_penalty\x18\x06 \x01(\v2\x10.common.v1.MoneyR\x10wrongSpotPenalty\"~\n" +
+	"\vcheck_in_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckInAt\"~\n" +
 	"\x0fCheckOutRequest\x12%\n" +
 	"\x0ereservation_id\x18\x01 \x01(\tR\rreservationId\x12\x1b\n" +
 	"\tdriver_id\x18\x02 \x01(\tR\bdriverId\x12'\n" +
@@ -1355,42 +1336,41 @@ var file_reservation_v1_reservation_proto_depIdxs = []int32{
 	24, // 13: reservation.v1.CheckInRequest.location:type_name -> common.v1.Coordinate
 	21, // 14: reservation.v1.CheckInResponse.status:type_name -> common.v1.ReservationStatus
 	22, // 15: reservation.v1.CheckInResponse.check_in_at:type_name -> google.protobuf.Timestamp
-	23, // 16: reservation.v1.CheckInResponse.wrong_spot_penalty:type_name -> common.v1.Money
-	21, // 17: reservation.v1.CheckOutResponse.status:type_name -> common.v1.ReservationStatus
-	22, // 18: reservation.v1.CheckOutResponse.check_out_at:type_name -> google.protobuf.Timestamp
-	18, // 19: reservation.v1.GetAvailabilityRequest.vehicle_type:type_name -> common.v1.VehicleType
-	18, // 20: reservation.v1.GetAvailabilityResponse.vehicle_type:type_name -> common.v1.VehicleType
-	18, // 21: reservation.v1.ListAvailableSpotsRequest.vehicle_type:type_name -> common.v1.VehicleType
-	16, // 22: reservation.v1.ListAvailableSpotsResponse.spots:type_name -> reservation.v1.SpotAvailability
-	20, // 23: reservation.v1.SpotAvailability.spot:type_name -> common.v1.Spot
-	22, // 24: reservation.v1.SpotAvailability.estimated_available_at:type_name -> google.protobuf.Timestamp
-	20, // 25: reservation.v1.Reservation.spot:type_name -> common.v1.Spot
-	21, // 26: reservation.v1.Reservation.status:type_name -> common.v1.ReservationStatus
-	19, // 27: reservation.v1.Reservation.assignment_mode:type_name -> common.v1.AssignmentMode
-	22, // 28: reservation.v1.Reservation.confirmed_at:type_name -> google.protobuf.Timestamp
-	22, // 29: reservation.v1.Reservation.expires_at:type_name -> google.protobuf.Timestamp
-	22, // 30: reservation.v1.Reservation.cancelled_at:type_name -> google.protobuf.Timestamp
-	0,  // 31: reservation.v1.ReservationService.CreateReservation:input_type -> reservation.v1.CreateReservationRequest
-	2,  // 32: reservation.v1.ReservationService.CancelReservation:input_type -> reservation.v1.CancelReservationRequest
-	4,  // 33: reservation.v1.ReservationService.GetReservation:input_type -> reservation.v1.GetReservationRequest
-	6,  // 34: reservation.v1.ReservationService.GetActiveReservation:input_type -> reservation.v1.GetActiveReservationRequest
-	8,  // 35: reservation.v1.ReservationService.CheckIn:input_type -> reservation.v1.CheckInRequest
-	10, // 36: reservation.v1.ReservationService.CheckOut:input_type -> reservation.v1.CheckOutRequest
-	12, // 37: reservation.v1.ReservationService.GetAvailability:input_type -> reservation.v1.GetAvailabilityRequest
-	14, // 38: reservation.v1.ReservationService.ListAvailableSpots:input_type -> reservation.v1.ListAvailableSpotsRequest
-	1,  // 39: reservation.v1.ReservationService.CreateReservation:output_type -> reservation.v1.CreateReservationResponse
-	3,  // 40: reservation.v1.ReservationService.CancelReservation:output_type -> reservation.v1.CancelReservationResponse
-	5,  // 41: reservation.v1.ReservationService.GetReservation:output_type -> reservation.v1.GetReservationResponse
-	7,  // 42: reservation.v1.ReservationService.GetActiveReservation:output_type -> reservation.v1.GetActiveReservationResponse
-	9,  // 43: reservation.v1.ReservationService.CheckIn:output_type -> reservation.v1.CheckInResponse
-	11, // 44: reservation.v1.ReservationService.CheckOut:output_type -> reservation.v1.CheckOutResponse
-	13, // 45: reservation.v1.ReservationService.GetAvailability:output_type -> reservation.v1.GetAvailabilityResponse
-	15, // 46: reservation.v1.ReservationService.ListAvailableSpots:output_type -> reservation.v1.ListAvailableSpotsResponse
-	39, // [39:47] is the sub-list for method output_type
-	31, // [31:39] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	21, // 16: reservation.v1.CheckOutResponse.status:type_name -> common.v1.ReservationStatus
+	22, // 17: reservation.v1.CheckOutResponse.check_out_at:type_name -> google.protobuf.Timestamp
+	18, // 18: reservation.v1.GetAvailabilityRequest.vehicle_type:type_name -> common.v1.VehicleType
+	18, // 19: reservation.v1.GetAvailabilityResponse.vehicle_type:type_name -> common.v1.VehicleType
+	18, // 20: reservation.v1.ListAvailableSpotsRequest.vehicle_type:type_name -> common.v1.VehicleType
+	16, // 21: reservation.v1.ListAvailableSpotsResponse.spots:type_name -> reservation.v1.SpotAvailability
+	20, // 22: reservation.v1.SpotAvailability.spot:type_name -> common.v1.Spot
+	22, // 23: reservation.v1.SpotAvailability.estimated_available_at:type_name -> google.protobuf.Timestamp
+	20, // 24: reservation.v1.Reservation.spot:type_name -> common.v1.Spot
+	21, // 25: reservation.v1.Reservation.status:type_name -> common.v1.ReservationStatus
+	19, // 26: reservation.v1.Reservation.assignment_mode:type_name -> common.v1.AssignmentMode
+	22, // 27: reservation.v1.Reservation.confirmed_at:type_name -> google.protobuf.Timestamp
+	22, // 28: reservation.v1.Reservation.expires_at:type_name -> google.protobuf.Timestamp
+	22, // 29: reservation.v1.Reservation.cancelled_at:type_name -> google.protobuf.Timestamp
+	0,  // 30: reservation.v1.ReservationService.CreateReservation:input_type -> reservation.v1.CreateReservationRequest
+	2,  // 31: reservation.v1.ReservationService.CancelReservation:input_type -> reservation.v1.CancelReservationRequest
+	4,  // 32: reservation.v1.ReservationService.GetReservation:input_type -> reservation.v1.GetReservationRequest
+	6,  // 33: reservation.v1.ReservationService.GetActiveReservation:input_type -> reservation.v1.GetActiveReservationRequest
+	8,  // 34: reservation.v1.ReservationService.CheckIn:input_type -> reservation.v1.CheckInRequest
+	10, // 35: reservation.v1.ReservationService.CheckOut:input_type -> reservation.v1.CheckOutRequest
+	12, // 36: reservation.v1.ReservationService.GetAvailability:input_type -> reservation.v1.GetAvailabilityRequest
+	14, // 37: reservation.v1.ReservationService.ListAvailableSpots:input_type -> reservation.v1.ListAvailableSpotsRequest
+	1,  // 38: reservation.v1.ReservationService.CreateReservation:output_type -> reservation.v1.CreateReservationResponse
+	3,  // 39: reservation.v1.ReservationService.CancelReservation:output_type -> reservation.v1.CancelReservationResponse
+	5,  // 40: reservation.v1.ReservationService.GetReservation:output_type -> reservation.v1.GetReservationResponse
+	7,  // 41: reservation.v1.ReservationService.GetActiveReservation:output_type -> reservation.v1.GetActiveReservationResponse
+	9,  // 42: reservation.v1.ReservationService.CheckIn:output_type -> reservation.v1.CheckInResponse
+	11, // 43: reservation.v1.ReservationService.CheckOut:output_type -> reservation.v1.CheckOutResponse
+	13, // 44: reservation.v1.ReservationService.GetAvailability:output_type -> reservation.v1.GetAvailabilityResponse
+	15, // 45: reservation.v1.ReservationService.ListAvailableSpots:output_type -> reservation.v1.ListAvailableSpotsResponse
+	38, // [38:46] is the sub-list for method output_type
+	30, // [30:38] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_reservation_v1_reservation_proto_init() }

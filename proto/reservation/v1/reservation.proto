@@ -134,8 +134,6 @@ message CheckInResponse {
   string                    session_id      = 2;
   common.v1.ReservationStatus status        = 3;  // ACTIVE
   google.protobuf.Timestamp check_in_at     = 4;
-  bool                      wrong_spot      = 5;  // true kalau actual_spot != reserved_spot
-  common.v1.Money           wrong_spot_penalty = 6;  // 200.000 IDR kalau wrong_spot = true
 }
 
 // ─────────────────────────────────────────
