@@ -30,8 +30,7 @@ type GenerateInvoiceRequest struct {
 	DriverId       string                 `protobuf:"bytes,3,opt,name=driver_id,json=driverId,proto3" json:"driver_id,omitempty"`
 	CheckInAt      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=check_in_at,json=checkInAt,proto3" json:"check_in_at,omitempty"`
 	CheckOutAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=check_out_at,json=checkOutAt,proto3" json:"check_out_at,omitempty"`
-	WrongSpot      bool                   `protobuf:"varint,6,opt,name=wrong_spot,json=wrongSpot,proto3" json:"wrong_spot,omitempty"`
-	IdempotencyKey string                 `protobuf:"bytes,7,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,6,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -99,13 +98,6 @@ func (x *GenerateInvoiceRequest) GetCheckOutAt() *timestamppb.Timestamp {
 		return x.CheckOutAt
 	}
 	return nil
-}
-
-func (x *GenerateInvoiceRequest) GetWrongSpot() bool {
-	if x != nil {
-		return x.WrongSpot
-	}
-	return false
 }
 
 func (x *GenerateInvoiceRequest) GetIdempotencyKey() string {
@@ -352,11 +344,9 @@ func (x *GetInvoiceBySessionResponse) GetInvoice() *Invoice {
 }
 
 type PreviewBillingRequest struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	CheckInAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=check_in_at,json=checkInAt,proto3" json:"check_in_at,omitempty"`
-	// check_out_at = sekarang (dihitung di server)
-	WrongSpot     bool `protobuf:"varint,3,opt,name=wrong_spot,json=wrongSpot,proto3" json:"wrong_spot,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	CheckInAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=check_in_at,json=checkInAt,proto3" json:"check_in_at,omitempty"` // check_out_at = sekarang (dihitung di server)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -403,13 +393,6 @@ func (x *PreviewBillingRequest) GetCheckInAt() *timestamppb.Timestamp {
 		return x.CheckInAt
 	}
 	return nil
-}
-
-func (x *PreviewBillingRequest) GetWrongSpot() bool {
-	if x != nil {
-		return x.WrongSpot
-	}
-	return false
 }
 
 type PreviewBillingResponse struct {
@@ -825,11 +808,9 @@ type BillingBreakdown struct {
 	BookingFee            *v1.Money              `protobuf:"bytes,1,opt,name=booking_fee,json=bookingFee,proto3" json:"booking_fee,omitempty"`       // selalu 5.000 IDR
 	ParkingFee            *v1.Money              `protobuf:"bytes,2,opt,name=parking_fee,json=parkingFee,proto3" json:"parking_fee,omitempty"`       // hourly rate
 	OvernightFee          *v1.Money              `protobuf:"bytes,3,opt,name=overnight_fee,json=overnightFee,proto3" json:"overnight_fee,omitempty"` // 0 atau 20.000 IDR
-	PenaltyFee            *v1.Money              `protobuf:"bytes,4,opt,name=penalty_fee,json=penaltyFee,proto3" json:"penalty_fee,omitempty"`       // 0 atau 200.000 IDR (wrong spot)
-	BilledHours           int32                  `protobuf:"varint,5,opt,name=billed_hours,json=billedHours,proto3" json:"billed_hours,omitempty"`   // jumlah jam yang ditagih (ceil)
-	ActualDurationMinutes int64                  `protobuf:"varint,6,opt,name=actual_duration_minutes,json=actualDurationMinutes,proto3" json:"actual_duration_minutes,omitempty"`
-	IsOvernight           bool                   `protobuf:"varint,7,opt,name=is_overnight,json=isOvernight,proto3" json:"is_overnight,omitempty"`
-	HasWrongSpotPenalty   bool                   `protobuf:"varint,8,opt,name=has_wrong_spot_penalty,json=hasWrongSpotPenalty,proto3" json:"has_wrong_spot_penalty,omitempty"`
+	BilledHours           int32                  `protobuf:"varint,4,opt,name=billed_hours,json=billedHours,proto3" json:"billed_hours,omitempty"`   // jumlah jam yang ditagih (ceil)
+	ActualDurationMinutes int64                  `protobuf:"varint,5,opt,name=actual_duration_minutes,json=actualDurationMinutes,proto3" json:"actual_duration_minutes,omitempty"`
+	IsOvernight           bool                   `protobuf:"varint,6,opt,name=is_overnight,json=isOvernight,proto3" json:"is_overnight,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -885,13 +866,6 @@ func (x *BillingBreakdown) GetOvernightFee() *v1.Money {
 	return nil
 }
 
-func (x *BillingBreakdown) GetPenaltyFee() *v1.Money {
-	if x != nil {
-		return x.PenaltyFee
-	}
-	return nil
-}
-
 func (x *BillingBreakdown) GetBilledHours() int32 {
 	if x != nil {
 		return x.BilledHours
@@ -913,19 +887,12 @@ func (x *BillingBreakdown) GetIsOvernight() bool {
 	return false
 }
 
-func (x *BillingBreakdown) GetHasWrongSpotPenalty() bool {
-	if x != nil {
-		return x.HasWrongSpotPenalty
-	}
-	return false
-}
-
 var File_billing_v1_billing_proto protoreflect.FileDescriptor
 
 const file_billing_v1_billing_proto_rawDesc = "" +
 	"\n" +
 	"\x18billing/v1/billing.proto\x12\n" +
-	"billing.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16common/v1/common.proto\"\xbd\x02\n" +
+	"billing.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16common/v1/common.proto\"\x9e\x02\n" +
 	"\x16GenerateInvoiceRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12%\n" +
@@ -933,10 +900,8 @@ const file_billing_v1_billing_proto_rawDesc = "" +
 	"\tdriver_id\x18\x03 \x01(\tR\bdriverId\x12:\n" +
 	"\vcheck_in_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckInAt\x12<\n" +
 	"\fcheck_out_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"checkOutAt\x12\x1d\n" +
-	"\n" +
-	"wrong_spot\x18\x06 \x01(\bR\twrongSpot\x12'\n" +
-	"\x0fidempotency_key\x18\a \x01(\tR\x0eidempotencyKey\"\xa6\x01\n" +
+	"checkOutAt\x12'\n" +
+	"\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\"\xa6\x01\n" +
 	"\x17GenerateInvoiceResponse\x12\x1d\n" +
 	"\n" +
 	"invoice_id\x18\x01 \x01(\tR\tinvoiceId\x12-\n" +
@@ -951,13 +916,11 @@ const file_billing_v1_billing_proto_rawDesc = "" +
 	"\x12GetInvoiceResponse\x12-\n" +
 	"\ainvoice\x18\x01 \x01(\v2\x13.billing.v1.InvoiceR\ainvoice\"L\n" +
 	"\x1bGetInvoiceBySessionResponse\x12-\n" +
-	"\ainvoice\x18\x01 \x01(\v2\x13.billing.v1.InvoiceR\ainvoice\"\x91\x01\n" +
+	"\ainvoice\x18\x01 \x01(\v2\x13.billing.v1.InvoiceR\ainvoice\"r\n" +
 	"\x15PreviewBillingRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12:\n" +
-	"\vcheck_in_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckInAt\x12\x1d\n" +
-	"\n" +
-	"wrong_spot\x18\x03 \x01(\bR\twrongSpot\"\xa3\x01\n" +
+	"\vcheck_in_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckInAt\"\xa3\x01\n" +
 	"\x16PreviewBillingResponse\x12:\n" +
 	"\tbreakdown\x18\x01 \x01(\v2\x1c.billing.v1.BillingBreakdownR\tbreakdown\x129\n" +
 	"\x0festimated_total\x18\x02 \x01(\v2\x10.common.v1.MoneyR\x0eestimatedTotal\x12\x12\n" +
@@ -993,19 +956,16 @@ const file_billing_v1_billing_proto_rawDesc = "" +
 	"\x06status\x18\a \x01(\x0e2\x18.common.v1.InvoiceStatusR\x06status\x129\n" +
 	"\n" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x123\n" +
-	"\apaid_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\x06paidAt\"\x95\x03\n" +
+	"\apaid_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\x06paidAt\"\xad\x02\n" +
 	"\x10BillingBreakdown\x121\n" +
 	"\vbooking_fee\x18\x01 \x01(\v2\x10.common.v1.MoneyR\n" +
 	"bookingFee\x121\n" +
 	"\vparking_fee\x18\x02 \x01(\v2\x10.common.v1.MoneyR\n" +
 	"parkingFee\x125\n" +
-	"\rovernight_fee\x18\x03 \x01(\v2\x10.common.v1.MoneyR\fovernightFee\x121\n" +
-	"\vpenalty_fee\x18\x04 \x01(\v2\x10.common.v1.MoneyR\n" +
-	"penaltyFee\x12!\n" +
-	"\fbilled_hours\x18\x05 \x01(\x05R\vbilledHours\x126\n" +
-	"\x17actual_duration_minutes\x18\x06 \x01(\x03R\x15actualDurationMinutes\x12!\n" +
-	"\fis_overnight\x18\a \x01(\bR\visOvernight\x123\n" +
-	"\x16has_wrong_spot_penalty\x18\b \x01(\bR\x13hasWrongSpotPenalty2\xcd\x04\n" +
+	"\rovernight_fee\x18\x03 \x01(\v2\x10.common.v1.MoneyR\fovernightFee\x12!\n" +
+	"\fbilled_hours\x18\x04 \x01(\x05R\vbilledHours\x126\n" +
+	"\x17actual_duration_minutes\x18\x05 \x01(\x03R\x15actualDurationMinutes\x12!\n" +
+	"\fis_overnight\x18\x06 \x01(\bR\visOvernight2\xcd\x04\n" +
 	"\x0eBillingService\x12Z\n" +
 	"\x0fGenerateInvoice\x12\".billing.v1.GenerateInvoiceRequest\x1a#.billing.v1.GenerateInvoiceResponse\x12K\n" +
 	"\n" +
@@ -1072,24 +1032,23 @@ var file_billing_v1_billing_proto_depIdxs = []int32{
 	15, // 20: billing.v1.BillingBreakdown.booking_fee:type_name -> common.v1.Money
 	15, // 21: billing.v1.BillingBreakdown.parking_fee:type_name -> common.v1.Money
 	15, // 22: billing.v1.BillingBreakdown.overnight_fee:type_name -> common.v1.Money
-	15, // 23: billing.v1.BillingBreakdown.penalty_fee:type_name -> common.v1.Money
-	0,  // 24: billing.v1.BillingService.GenerateInvoice:input_type -> billing.v1.GenerateInvoiceRequest
-	2,  // 25: billing.v1.BillingService.GetInvoice:input_type -> billing.v1.GetInvoiceRequest
-	3,  // 26: billing.v1.BillingService.GetInvoiceBySession:input_type -> billing.v1.GetInvoiceBySessionRequest
-	6,  // 27: billing.v1.BillingService.PreviewBilling:input_type -> billing.v1.PreviewBillingRequest
-	8,  // 28: billing.v1.BillingService.CalculateCancellationFee:input_type -> billing.v1.CalculateCancellationFeeRequest
-	10, // 29: billing.v1.BillingService.MarkInvoicePaid:input_type -> billing.v1.MarkInvoicePaidRequest
-	1,  // 30: billing.v1.BillingService.GenerateInvoice:output_type -> billing.v1.GenerateInvoiceResponse
-	4,  // 31: billing.v1.BillingService.GetInvoice:output_type -> billing.v1.GetInvoiceResponse
-	5,  // 32: billing.v1.BillingService.GetInvoiceBySession:output_type -> billing.v1.GetInvoiceBySessionResponse
-	7,  // 33: billing.v1.BillingService.PreviewBilling:output_type -> billing.v1.PreviewBillingResponse
-	9,  // 34: billing.v1.BillingService.CalculateCancellationFee:output_type -> billing.v1.CalculateCancellationFeeResponse
-	11, // 35: billing.v1.BillingService.MarkInvoicePaid:output_type -> billing.v1.MarkInvoicePaidResponse
-	30, // [30:36] is the sub-list for method output_type
-	24, // [24:30] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	0,  // 23: billing.v1.BillingService.GenerateInvoice:input_type -> billing.v1.GenerateInvoiceRequest
+	2,  // 24: billing.v1.BillingService.GetInvoice:input_type -> billing.v1.GetInvoiceRequest
+	3,  // 25: billing.v1.BillingService.GetInvoiceBySession:input_type -> billing.v1.GetInvoiceBySessionRequest
+	6,  // 26: billing.v1.BillingService.PreviewBilling:input_type -> billing.v1.PreviewBillingRequest
+	8,  // 27: billing.v1.BillingService.CalculateCancellationFee:input_type -> billing.v1.CalculateCancellationFeeRequest
+	10, // 28: billing.v1.BillingService.MarkInvoicePaid:input_type -> billing.v1.MarkInvoicePaidRequest
+	1,  // 29: billing.v1.BillingService.GenerateInvoice:output_type -> billing.v1.GenerateInvoiceResponse
+	4,  // 30: billing.v1.BillingService.GetInvoice:output_type -> billing.v1.GetInvoiceResponse
+	5,  // 31: billing.v1.BillingService.GetInvoiceBySession:output_type -> billing.v1.GetInvoiceBySessionResponse
+	7,  // 32: billing.v1.BillingService.PreviewBilling:output_type -> billing.v1.PreviewBillingResponse
+	9,  // 33: billing.v1.BillingService.CalculateCancellationFee:output_type -> billing.v1.CalculateCancellationFeeResponse
+	11, // 34: billing.v1.BillingService.MarkInvoicePaid:output_type -> billing.v1.MarkInvoicePaidResponse
+	29, // [29:35] is the sub-list for method output_type
+	23, // [23:29] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_billing_v1_billing_proto_init() }

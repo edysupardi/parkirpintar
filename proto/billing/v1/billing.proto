@@ -50,8 +50,7 @@ message GenerateInvoiceRequest {
   string                    driver_id       = 3;
   google.protobuf.Timestamp check_in_at     = 4;
   google.protobuf.Timestamp check_out_at    = 5;
-  bool                      wrong_spot      = 6;
-  string                    idempotency_key = 7;
+  string                    idempotency_key = 6;
 }
 
 message GenerateInvoiceResponse {
@@ -88,7 +87,6 @@ message PreviewBillingRequest {
   string                    session_id  = 1;
   google.protobuf.Timestamp check_in_at = 2;
   // check_out_at = sekarang (dihitung di server)
-  bool wrong_spot = 3;
 }
 
 message PreviewBillingResponse {
@@ -152,9 +150,7 @@ message BillingBreakdown {
   common.v1.Money booking_fee     = 1;  // selalu 5.000 IDR
   common.v1.Money parking_fee     = 2;  // hourly rate
   common.v1.Money overnight_fee   = 3;  // 0 atau 20.000 IDR
-  common.v1.Money penalty_fee     = 4;  // 0 atau 200.000 IDR (wrong spot)
-  int32           billed_hours    = 5;  // jumlah jam yang ditagih (ceil)
-  int64           actual_duration_minutes = 6;
-  bool            is_overnight    = 7;
-  bool            has_wrong_spot_penalty = 8;
+  int32           billed_hours    = 4;  // jumlah jam yang ditagih (ceil)
+  int64           actual_duration_minutes = 5;
+  bool            is_overnight    = 6;
 }
