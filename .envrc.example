@@ -1,3 +1,5 @@
 export ANTHROPIC_BASE_URL="http://server.com"
 export ANTHROPIC_API_KEY="sk-app-key"
 export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-6"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4-6"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="minimax-m2.5"
