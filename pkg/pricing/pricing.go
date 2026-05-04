@@ -8,7 +8,7 @@ const (
 	OvernightFee     int64 = 20_000
 	CancellationFree int64 = 0
 	CancellationFee  int64 = 5_000
-	NoShowFee        int64 = 5_000
+	NoShowFee        int64 = 0 // booking fee 5,000 already charged at confirmation
 	FreeCancelWindow       = 2 * time.Minute
 )
 

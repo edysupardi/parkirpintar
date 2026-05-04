@@ -66,5 +66,5 @@ func TestCalculateCancellationFee_Over2Min(t *testing.T) {
 func TestCalculateCancellationFee_NoShow(t *testing.T) {
 	confirmed := time.Now()
 	cancelled := confirmed.Add(61 * time.Minute)
-	assert.Equal(t, int64(5_000), pricing.CalculateCancellationFee(confirmed, cancelled, true))
+	assert.Equal(t, int64(0), pricing.CalculateCancellationFee(confirmed, cancelled, true))
 }

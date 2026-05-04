@@ -34,7 +34,7 @@ ParkirPintar adalah sistem smart parking berbasis microservices yang memungkinka
 - Single parking area, centralized inventory - 5 lantai, 30 mobil + 50 motor per lantai (total: 150 mobil, 250 motor)
 - Reservation dengan Redis inventory lock untuk mencegah double-booking
 - Billing dihitung dari actual parking session duration
-- Real-time location tracking ≤ 30 detik untuk auto-detect arrival via geofence
+- Real-time location tracking via presence service
 - Payment via Midtrans: QRIS, Virtual Account, GoPay, OVO, Dana
 - Notification via FCM (push) dan Amazon SES (email)
 
@@ -47,7 +47,7 @@ ParkirPintar adalah sistem smart parking berbasis microservices yang memungkinka
 | A1 | Sistem hanya melayani 1 area parkir (single-tenant) | Sesuai soal: "single, fixed parking area" |
 | A2 | Tidak ada Host onboarding - spot sudah pre-seeded di database | Sesuai soal: "centralized inventory", tidak ada multi-host |
 | A3 | Driver diasumsikan sudah authenticated via super app (JWT diterima as-is) | Sesuai soal: "mini app inside a super app" |
-| A4 | Geofence radius untuk auto check-in: 50 meter dari koordinat parkir | Tidak disebutkan di soal, ini reasonable default |
+| A4 | Geofence / auto check-in tidak diimplementasi — check-in dilakukan manual oleh Driver | Tidak ada di requirement |
 | A5 | Timezone sistem adalah WIB (UTC+7) untuk overnight fee | Konteks Jakarta |
 | A6 | "Crossing midnight" = session melewati 00:00 WIB | Kalkulasi overnight fee |
 | A7 | Satu driver hanya boleh punya 1 active reservation pada satu waktu | Mencegah abuse |
@@ -118,7 +118,7 @@ graph TD
 | Reservation Service | Go + gRPC | Core business: book, cancel, expire |
 | Billing Service | Go + gRPC | Pricing engine, invoice generation |
 | Payment Service | Go + gRPC | Midtrans integration, webhook handler |
-| Presence Service | Go + gRPC streaming | Location tracking, geofence detection |
+| Presence Service | Go + gRPC streaming | Location tracking, bidirectional streaming |
 | Notification Service | Go + gRPC | FCM push + SES email (stub-able) |
 | Aurora Serverless v2 | PostgreSQL-compatible | Primary datastore |
 | ElastiCache Serverless | Redis 7.x | Distributed lock, idempotency, cache |
@@ -183,7 +183,7 @@ flowchart LR
 
     E1 -->|FCM + Email konfirmasi| NOTIF
     E2 -->|FCM + Email expired| NOTIF
-    E2 -->|apply no-show fee| BS
+    E2 -->|release spot, booking fee forfeited| BS
     E3 -->|update status ke ACTIVE| RS2
     E3 -->|FCM welcome| NOTIF
     E4 -->|generate invoice| BS
@@ -202,9 +202,9 @@ stateDiagram-v2
 
     PENDING --> CONFIRMED : System validates\nand locks inventory
 
-    CONFIRMED --> ACTIVE : Driver check-in\nmanual or geofence auto-detect
+    CONFIRMED --> ACTIVE : Driver check-in\nmanual
 
-    CONFIRMED --> EXPIRED : No check-in within 1 hour\nfee 10.000 IDR
+    CONFIRMED --> EXPIRED : No check-in within 1 hour\nfee 5.000 IDR
 
     CONFIRMED --> CANCELLED : Cancel within 2 minutes\nfee 0 IDR
 
@@ -295,7 +295,6 @@ stateDiagram-v2
 | Booking fee | 5.000 IDR — charged saat reservation confirmed |
 | Hourly rate | 5.000 IDR/jam — first hour + each **started** hour |
 | Overnight fee | 20.000 IDR flat — jika session crossing midnight WIB |
-| Wrong spot penalty | 200.000 IDR |
 | Overstay | Tidak ada penalty — billing normal (hourly rate) |
 
 **Cancellation fee:**
@@ -304,7 +303,7 @@ stateDiagram-v2
 |---------|-----|
 | Cancel < 2 menit setelah konfirmasi | 0 IDR |
 | Cancel > 2 menit, sebelum check-in | 5.000 IDR |
-| No-show > 1 jam tidak check-in | 10.000 IDR + auto-expire |
+| No-show > 1 jam tidak check-in | 0 IDR + auto-expire (booking fee 5.000 sudah dibayar saat confirmed) |
 
 **Contoh kalkulasi:**
 
@@ -386,7 +385,7 @@ notif_logs  parking_sessions
 | Database | Aurora Serverless v2 | RDS PostgreSQL, DynamoDB | Traffic bersifat peak-hour. Aurora scale 0.5–128 ACU otomatis. DynamoDB tidak cocok untuk skema relasional kompleks ini |
 | Cache/Lock | ElastiCache Serverless Redis | Memcached, self-hosted Redis | Redis SET NX adalah primitive paling tepat untuk distributed lock. Soal secara eksplisit menyebut Redis-based lock |
 | Message Queue | Amazon MQ (RabbitMQ) | Kafka (MSK), SQS+SNS | Kafka untuk jutaan events/detik. Sistem ini ~1.600 events/hari - Kafka over-engineering. RabbitMQ AMQP lebih fleksibel dari SQS untuk fan-out pattern |
-| Load Balancer | ALB (external) + NLB (internal) | ALB only, App Mesh | NLB TCP pass-through paling straightforward untuk gRPC internal. ALB untuk REST external karena support WAF dan routing rules |
+| Load Balancer | ALB (external) + NLB (internal) + client-side LB | ALB only, App Mesh | NLB TCP pass-through untuk gRPC internal dikombinasikan dengan client-side load balancing (DNS round-robin via ECS Service Discovery). ALB untuk REST external karena support WAF dan routing rules. ALB internal bisa distribute gRPC lebih merata tapi tambah latency dan cost — trade-off yang tidak worth untuk skala ini |
 | Payment | Midtrans | Xendit, Stripe | Stripe tidak support QRIS/VA Indonesia/e-wallet lokal. Midtrans cover semua dalam satu integrasi|
 | IaC | Terraform | AWS CDK, CloudFormation | Industry standard, multi-cloud, AWS provider paling mature, paling mudah di-review oleh siapapun |
 | Notification | FCM + Amazon SES | AWS SNS, SendGrid | FCM standard untuk mobile push. SES murah ($0.10/1000 email), native AWS, bounce handling otomatis |
@@ -522,7 +521,6 @@ Path-based trigger: hanya service yang berubah yang di-build ulang.
 | Booking fee | 5.000 IDR (saat reservation confirmed) |
 | Hourly rate | 5.000 IDR/jam (first + each started hour) |
 | Overnight fee | 20.000 IDR flat (crossing midnight WIB) |
-| Wrong spot penalty | 200.000 IDR |
 | Overstay penalty | Tidak ada - billing normal |
 
 ### Cancellation Policy
@@ -531,7 +529,7 @@ Path-based trigger: hanya service yang berubah yang di-build ulang.
 |---------|-----|
 | < 2 menit setelah konfirmasi | 0 IDR |
 | > 2 menit, sebelum check-in | 5.000 IDR |
-| No-show (> 1 jam tidak check-in) | 10.000 IDR + auto-expire |
+| No-show (> 1 jam tidak check-in) | 5.000 IDR + auto-expire |
 
 ### Reservation Rules
 
@@ -539,7 +537,6 @@ Path-based trigger: hanya service yang berubah yang di-build ulang.
 |------|-------|
 | Hold time | 1 jam setelah confirmation |
 | Assignment modes | System-assigned atau User-selected |
-| Wrong spot | Penalty 200.000 IDR, session tetap berjalan |
 
 ---
 
@@ -556,10 +553,9 @@ pkg/pricing/
   TestPricingEngine_HourlyRate_StartedHour      ← 1j 1m = 2 jam
   TestPricingEngine_OvernightFee_CrossingMidnight
   TestPricingEngine_OvernightFee_SameDay
-  TestPricingEngine_WrongSpotPenalty
   TestPricingEngine_CancellationFee_Under2Min
   TestPricingEngine_CancellationFee_Over2Min
-  TestPricingEngine_NoShowFee
+  TestPricingEngine_NoShow_NoExtraCharge
   TestPricingEngine_Overstay_NoPenalty
 
 pkg/lock/
@@ -587,16 +583,15 @@ Event publishing dan consuming via RabbitMQ
 | E2E-01 | Happy path reservation → check-in → check-out → pay |
 | E2E-02 | Double-book prevention - spot sama ditolak |
 | E2E-03 | User-selected spot contention - queue mechanism |
-| E2E-04 | Reservation expiry (no-show) - auto-expire + fee 10.000 |
-| E2E-05 | Wrong-spot penalty - 200.000 IDR applied |
-| E2E-06 | Cancellation < 2 menit - fee 0 IDR |
-| E2E-07 | Cancellation > 2 menit - fee 5.000 IDR |
-| E2E-08 | Extended stay (overstay) - normal rate, no penalty |
-| E2E-09 | Overnight fee - crossing midnight +20.000 IDR |
-| E2E-10 | Payment QRIS - success |
-| E2E-11 | Payment QRIS - failure |
-| E2E-12 | Payment Virtual Account - VA number + polling fallback |
-| E2E-13 | Duplicate webhook - idempotent, no double-charge |
+| E2E-04 | Reservation expiry (no-show) - auto-expire, booking fee forfeited, no extra charge |
+| E2E-05 | Cancellation < 2 menit - fee 0 IDR |
+| E2E-06 | Cancellation > 2 menit - fee 5.000 IDR |
+| E2E-07 | Extended stay (overstay) - normal rate, no penalty |
+| E2E-08 | Overnight fee - crossing midnight +20.000 IDR |
+| E2E-09 | Payment QRIS - success |
+| E2E-10 | Payment QRIS - failure |
+| E2E-11 | Payment Virtual Account - VA number + polling fallback |
+| E2E-12 | Duplicate webhook - idempotent, no double-charge |
 
 ---
 
