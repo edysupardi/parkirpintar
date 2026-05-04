@@ -143,12 +143,10 @@ message CheckInRequest {
 }
 
 message CheckInResponse {
-  string                      reservation_id     = 1;
-  string                      session_id         = 2;
-  common.v1.ReservationStatus status             = 3;
-  google.protobuf.Timestamp   check_in_at        = 4;
-  bool                        wrong_spot         = 5;
-  common.v1.Money             wrong_spot_penalty = 6;
+  string                      reservation_id = 1;
+  string                      session_id     = 2;
+  common.v1.ReservationStatus status         = 3;
+  google.protobuf.Timestamp   check_in_at    = 4;
 }
 
 message CheckOutRequest {
@@ -186,14 +184,13 @@ message PreviewBillingResponse {
 }
 
 message InvoiceSummary {
-  string          invoice_id   = 1;
-  common.v1.Money booking_fee  = 2;
-  common.v1.Money parking_fee  = 3;
+  string          invoice_id    = 1;
+  common.v1.Money booking_fee   = 2;
+  common.v1.Money parking_fee   = 3;
   common.v1.Money overnight_fee = 4;
-  common.v1.Money penalty_fee  = 5;
-  common.v1.Money total_amount = 6;
-  string          status       = 7;
-  int32           billed_hours = 8;
+  common.v1.Money total_amount  = 5;
+  string          status        = 6;
+  int32           billed_hours  = 7;
 }
 
 // ─────────────────────────────────────────

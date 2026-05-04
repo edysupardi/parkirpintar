@@ -686,15 +686,13 @@ func (x *CheckInRequest) GetActualSpotId() string {
 }
 
 type CheckInResponse struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	ReservationId    string                 `protobuf:"bytes,1,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
-	SessionId        string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Status           v1.ReservationStatus   `protobuf:"varint,3,opt,name=status,proto3,enum=common.v1.ReservationStatus" json:"status,omitempty"`
-	CheckInAt        *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=check_in_at,json=checkInAt,proto3" json:"check_in_at,omitempty"`
-	WrongSpot        bool                   `protobuf:"varint,5,opt,name=wrong_spot,json=wrongSpot,proto3" json:"wrong_spot,omitempty"`
-	WrongSpotPenalty *v1.Money              `protobuf:"bytes,6,opt,name=wrong_spot_penalty,json=wrongSpotPenalty,proto3" json:"wrong_spot_penalty,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ReservationId string                 `protobuf:"bytes,1,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Status        v1.ReservationStatus   `protobuf:"varint,3,opt,name=status,proto3,enum=common.v1.ReservationStatus" json:"status,omitempty"`
+	CheckInAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=check_in_at,json=checkInAt,proto3" json:"check_in_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CheckInResponse) Reset() {
@@ -751,20 +749,6 @@ func (x *CheckInResponse) GetStatus() v1.ReservationStatus {
 func (x *CheckInResponse) GetCheckInAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CheckInAt
-	}
-	return nil
-}
-
-func (x *CheckInResponse) GetWrongSpot() bool {
-	if x != nil {
-		return x.WrongSpot
-	}
-	return false
-}
-
-func (x *CheckInResponse) GetWrongSpotPenalty() *v1.Money {
-	if x != nil {
-		return x.WrongSpotPenalty
 	}
 	return nil
 }
@@ -1087,10 +1071,9 @@ type InvoiceSummary struct {
 	BookingFee    *v1.Money              `protobuf:"bytes,2,opt,name=booking_fee,json=bookingFee,proto3" json:"booking_fee,omitempty"`
 	ParkingFee    *v1.Money              `protobuf:"bytes,3,opt,name=parking_fee,json=parkingFee,proto3" json:"parking_fee,omitempty"`
 	OvernightFee  *v1.Money              `protobuf:"bytes,4,opt,name=overnight_fee,json=overnightFee,proto3" json:"overnight_fee,omitempty"`
-	PenaltyFee    *v1.Money              `protobuf:"bytes,5,opt,name=penalty_fee,json=penaltyFee,proto3" json:"penalty_fee,omitempty"`
-	TotalAmount   *v1.Money              `protobuf:"bytes,6,opt,name=total_amount,json=totalAmount,proto3" json:"total_amount,omitempty"`
-	Status        string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
-	BilledHours   int32                  `protobuf:"varint,8,opt,name=billed_hours,json=billedHours,proto3" json:"billed_hours,omitempty"`
+	TotalAmount   *v1.Money              `protobuf:"bytes,5,opt,name=total_amount,json=totalAmount,proto3" json:"total_amount,omitempty"`
+	Status        string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	BilledHours   int32                  `protobuf:"varint,7,opt,name=billed_hours,json=billedHours,proto3" json:"billed_hours,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1149,13 +1132,6 @@ func (x *InvoiceSummary) GetParkingFee() *v1.Money {
 func (x *InvoiceSummary) GetOvernightFee() *v1.Money {
 	if x != nil {
 		return x.OvernightFee
-	}
-	return nil
-}
-
-func (x *InvoiceSummary) GetPenaltyFee() *v1.Money {
-	if x != nil {
-		return x.PenaltyFee
 	}
 	return nil
 }
@@ -1740,16 +1716,13 @@ const file_gateway_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"coordinate\x18\x02 \x01(\v2\x15.common.v1.CoordinateR\n" +
 	"coordinate\x12$\n" +
-	"\x0eactual_spot_id\x18\x03 \x01(\tR\factualSpotId\"\xa8\x02\n" +
+	"\x0eactual_spot_id\x18\x03 \x01(\tR\factualSpotId\"\xc9\x01\n" +
 	"\x0fCheckInResponse\x12%\n" +
 	"\x0ereservation_id\x18\x01 \x01(\tR\rreservationId\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x124\n" +
 	"\x06status\x18\x03 \x01(\x0e2\x1c.common.v1.ReservationStatusR\x06status\x12:\n" +
-	"\vcheck_in_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckInAt\x12\x1d\n" +
-	"\n" +
-	"wrong_spot\x18\x05 \x01(\bR\twrongSpot\x12>\n" +
-	"\x12wrong_spot_penalty\x18\x06 \x01(\v2\x10.common.v1.MoneyR\x10wrongSpotPenalty\"a\n" +
+	"\vcheck_in_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckInAt\"a\n" +
 	"\x0fCheckOutRequest\x12%\n" +
 	"\x0ereservation_id\x18\x01 \x01(\tR\rreservationId\x12'\n" +
 	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\"\xfe\x01\n" +
@@ -1772,7 +1745,7 @@ const file_gateway_v1_gateway_proto_rawDesc = "" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\"f\n" +
 	"\x16PreviewBillingResponse\x128\n" +
 	"\testimated\x18\x01 \x01(\v2\x1a.gateway.v1.InvoiceSummaryR\testimated\x12\x12\n" +
-	"\x04note\x18\x02 \x01(\tR\x04note\"\xef\x02\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\"\xbc\x02\n" +
 	"\x0eInvoiceSummary\x12\x1d\n" +
 	"\n" +
 	"invoice_id\x18\x01 \x01(\tR\tinvoiceId\x121\n" +
@@ -1780,12 +1753,10 @@ const file_gateway_v1_gateway_proto_rawDesc = "" +
 	"bookingFee\x121\n" +
 	"\vparking_fee\x18\x03 \x01(\v2\x10.common.v1.MoneyR\n" +
 	"parkingFee\x125\n" +
-	"\rovernight_fee\x18\x04 \x01(\v2\x10.common.v1.MoneyR\fovernightFee\x121\n" +
-	"\vpenalty_fee\x18\x05 \x01(\v2\x10.common.v1.MoneyR\n" +
-	"penaltyFee\x123\n" +
-	"\ftotal_amount\x18\x06 \x01(\v2\x10.common.v1.MoneyR\vtotalAmount\x12\x16\n" +
-	"\x06status\x18\a \x01(\tR\x06status\x12!\n" +
-	"\fbilled_hours\x18\b \x01(\x05R\vbilledHours\"\x9f\x01\n" +
+	"\rovernight_fee\x18\x04 \x01(\v2\x10.common.v1.MoneyR\fovernightFee\x123\n" +
+	"\ftotal_amount\x18\x05 \x01(\v2\x10.common.v1.MoneyR\vtotalAmount\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12!\n" +
+	"\fbilled_hours\x18\a \x01(\x05R\vbilledHours\"\x9f\x01\n" +
 	"\x14CreatePaymentRequest\x12\x1d\n" +
 	"\n" +
 	"invoice_id\x18\x01 \x01(\tR\tinvoiceId\x12?\n" +
@@ -1916,55 +1887,53 @@ var file_gateway_v1_gateway_proto_depIdxs = []int32{
 	32, // 14: gateway.v1.CheckInRequest.coordinate:type_name -> common.v1.Coordinate
 	29, // 15: gateway.v1.CheckInResponse.status:type_name -> common.v1.ReservationStatus
 	30, // 16: gateway.v1.CheckInResponse.check_in_at:type_name -> google.protobuf.Timestamp
-	31, // 17: gateway.v1.CheckInResponse.wrong_spot_penalty:type_name -> common.v1.Money
-	30, // 18: gateway.v1.CheckOutResponse.check_out_at:type_name -> google.protobuf.Timestamp
-	18, // 19: gateway.v1.CheckOutResponse.invoice_summary:type_name -> gateway.v1.InvoiceSummary
-	18, // 20: gateway.v1.GetInvoiceResponse.invoice:type_name -> gateway.v1.InvoiceSummary
-	18, // 21: gateway.v1.PreviewBillingResponse.estimated:type_name -> gateway.v1.InvoiceSummary
-	31, // 22: gateway.v1.InvoiceSummary.booking_fee:type_name -> common.v1.Money
-	31, // 23: gateway.v1.InvoiceSummary.parking_fee:type_name -> common.v1.Money
-	31, // 24: gateway.v1.InvoiceSummary.overnight_fee:type_name -> common.v1.Money
-	31, // 25: gateway.v1.InvoiceSummary.penalty_fee:type_name -> common.v1.Money
-	31, // 26: gateway.v1.InvoiceSummary.total_amount:type_name -> common.v1.Money
-	33, // 27: gateway.v1.CreatePaymentRequest.payment_method:type_name -> common.v1.PaymentMethod
-	33, // 28: gateway.v1.CreatePaymentResponse.payment_method:type_name -> common.v1.PaymentMethod
-	30, // 29: gateway.v1.CreatePaymentResponse.expired_at:type_name -> google.protobuf.Timestamp
-	31, // 30: gateway.v1.GetPaymentStatusResponse.amount:type_name -> common.v1.Money
-	30, // 31: gateway.v1.GetPaymentStatusResponse.paid_at:type_name -> google.protobuf.Timestamp
-	32, // 32: gateway.v1.StreamMyLocationRequest.coordinate:type_name -> common.v1.Coordinate
-	30, // 33: gateway.v1.StreamMyLocationRequest.recorded_at:type_name -> google.protobuf.Timestamp
-	28, // 34: gateway.v1.Reservation.spot:type_name -> common.v1.Spot
-	29, // 35: gateway.v1.Reservation.status:type_name -> common.v1.ReservationStatus
-	30, // 36: gateway.v1.Reservation.confirmed_at:type_name -> google.protobuf.Timestamp
-	30, // 37: gateway.v1.Reservation.expires_at:type_name -> google.protobuf.Timestamp
-	30, // 38: gateway.v1.Reservation.check_in_at:type_name -> google.protobuf.Timestamp
-	0,  // 39: gateway.v1.GatewayService.GetParkingAvailability:input_type -> gateway.v1.GetParkingAvailabilityRequest
-	3,  // 40: gateway.v1.GatewayService.CreateReservation:input_type -> gateway.v1.CreateReservationRequest
-	6,  // 41: gateway.v1.GatewayService.GetMyReservation:input_type -> gateway.v1.GetMyReservationRequest
-	8,  // 42: gateway.v1.GatewayService.CancelReservation:input_type -> gateway.v1.CancelReservationRequest
-	10, // 43: gateway.v1.GatewayService.CheckIn:input_type -> gateway.v1.CheckInRequest
-	12, // 44: gateway.v1.GatewayService.CheckOut:input_type -> gateway.v1.CheckOutRequest
-	14, // 45: gateway.v1.GatewayService.GetInvoice:input_type -> gateway.v1.GetInvoiceRequest
-	16, // 46: gateway.v1.GatewayService.PreviewBilling:input_type -> gateway.v1.PreviewBillingRequest
-	19, // 47: gateway.v1.GatewayService.CreatePayment:input_type -> gateway.v1.CreatePaymentRequest
-	21, // 48: gateway.v1.GatewayService.GetPaymentStatus:input_type -> gateway.v1.GetPaymentStatusRequest
-	23, // 49: gateway.v1.GatewayService.StreamMyLocation:input_type -> gateway.v1.StreamMyLocationRequest
-	1,  // 50: gateway.v1.GatewayService.GetParkingAvailability:output_type -> gateway.v1.GetParkingAvailabilityResponse
-	4,  // 51: gateway.v1.GatewayService.CreateReservation:output_type -> gateway.v1.CreateReservationResponse
-	7,  // 52: gateway.v1.GatewayService.GetMyReservation:output_type -> gateway.v1.GetMyReservationResponse
-	9,  // 53: gateway.v1.GatewayService.CancelReservation:output_type -> gateway.v1.CancelReservationResponse
-	11, // 54: gateway.v1.GatewayService.CheckIn:output_type -> gateway.v1.CheckInResponse
-	13, // 55: gateway.v1.GatewayService.CheckOut:output_type -> gateway.v1.CheckOutResponse
-	15, // 56: gateway.v1.GatewayService.GetInvoice:output_type -> gateway.v1.GetInvoiceResponse
-	17, // 57: gateway.v1.GatewayService.PreviewBilling:output_type -> gateway.v1.PreviewBillingResponse
-	20, // 58: gateway.v1.GatewayService.CreatePayment:output_type -> gateway.v1.CreatePaymentResponse
-	22, // 59: gateway.v1.GatewayService.GetPaymentStatus:output_type -> gateway.v1.GetPaymentStatusResponse
-	24, // 60: gateway.v1.GatewayService.StreamMyLocation:output_type -> gateway.v1.StreamMyLocationResponse
-	50, // [50:61] is the sub-list for method output_type
-	39, // [39:50] is the sub-list for method input_type
-	39, // [39:39] is the sub-list for extension type_name
-	39, // [39:39] is the sub-list for extension extendee
-	0,  // [0:39] is the sub-list for field type_name
+	30, // 17: gateway.v1.CheckOutResponse.check_out_at:type_name -> google.protobuf.Timestamp
+	18, // 18: gateway.v1.CheckOutResponse.invoice_summary:type_name -> gateway.v1.InvoiceSummary
+	18, // 19: gateway.v1.GetInvoiceResponse.invoice:type_name -> gateway.v1.InvoiceSummary
+	18, // 20: gateway.v1.PreviewBillingResponse.estimated:type_name -> gateway.v1.InvoiceSummary
+	31, // 21: gateway.v1.InvoiceSummary.booking_fee:type_name -> common.v1.Money
+	31, // 22: gateway.v1.InvoiceSummary.parking_fee:type_name -> common.v1.Money
+	31, // 23: gateway.v1.InvoiceSummary.overnight_fee:type_name -> common.v1.Money
+	31, // 24: gateway.v1.InvoiceSummary.total_amount:type_name -> common.v1.Money
+	33, // 25: gateway.v1.CreatePaymentRequest.payment_method:type_name -> common.v1.PaymentMethod
+	33, // 26: gateway.v1.CreatePaymentResponse.payment_method:type_name -> common.v1.PaymentMethod
+	30, // 27: gateway.v1.CreatePaymentResponse.expired_at:type_name -> google.protobuf.Timestamp
+	31, // 28: gateway.v1.GetPaymentStatusResponse.amount:type_name -> common.v1.Money
+	30, // 29: gateway.v1.GetPaymentStatusResponse.paid_at:type_name -> google.protobuf.Timestamp
+	32, // 30: gateway.v1.StreamMyLocationRequest.coordinate:type_name -> common.v1.Coordinate
+	30, // 31: gateway.v1.StreamMyLocationRequest.recorded_at:type_name -> google.protobuf.Timestamp
+	28, // 32: gateway.v1.Reservation.spot:type_name -> common.v1.Spot
+	29, // 33: gateway.v1.Reservation.status:type_name -> common.v1.ReservationStatus
+	30, // 34: gateway.v1.Reservation.confirmed_at:type_name -> google.protobuf.Timestamp
+	30, // 35: gateway.v1.Reservation.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 36: gateway.v1.Reservation.check_in_at:type_name -> google.protobuf.Timestamp
+	0,  // 37: gateway.v1.GatewayService.GetParkingAvailability:input_type -> gateway.v1.GetParkingAvailabilityRequest
+	3,  // 38: gateway.v1.GatewayService.CreateReservation:input_type -> gateway.v1.CreateReservationRequest
+	6,  // 39: gateway.v1.GatewayService.GetMyReservation:input_type -> gateway.v1.GetMyReservationRequest
+	8,  // 40: gateway.v1.GatewayService.CancelReservation:input_type -> gateway.v1.CancelReservationRequest
+	10, // 41: gateway.v1.GatewayService.CheckIn:input_type -> gateway.v1.CheckInRequest
+	12, // 42: gateway.v1.GatewayService.CheckOut:input_type -> gateway.v1.CheckOutRequest
+	14, // 43: gateway.v1.GatewayService.GetInvoice:input_type -> gateway.v1.GetInvoiceRequest
+	16, // 44: gateway.v1.GatewayService.PreviewBilling:input_type -> gateway.v1.PreviewBillingRequest
+	19, // 45: gateway.v1.GatewayService.CreatePayment:input_type -> gateway.v1.CreatePaymentRequest
+	21, // 46: gateway.v1.GatewayService.GetPaymentStatus:input_type -> gateway.v1.GetPaymentStatusRequest
+	23, // 47: gateway.v1.GatewayService.StreamMyLocation:input_type -> gateway.v1.StreamMyLocationRequest
+	1,  // 48: gateway.v1.GatewayService.GetParkingAvailability:output_type -> gateway.v1.GetParkingAvailabilityResponse
+	4,  // 49: gateway.v1.GatewayService.CreateReservation:output_type -> gateway.v1.CreateReservationResponse
+	7,  // 50: gateway.v1.GatewayService.GetMyReservation:output_type -> gateway.v1.GetMyReservationResponse
+	9,  // 51: gateway.v1.GatewayService.CancelReservation:output_type -> gateway.v1.CancelReservationResponse
+	11, // 52: gateway.v1.GatewayService.CheckIn:output_type -> gateway.v1.CheckInResponse
+	13, // 53: gateway.v1.GatewayService.CheckOut:output_type -> gateway.v1.CheckOutResponse
+	15, // 54: gateway.v1.GatewayService.GetInvoice:output_type -> gateway.v1.GetInvoiceResponse
+	17, // 55: gateway.v1.GatewayService.PreviewBilling:output_type -> gateway.v1.PreviewBillingResponse
+	20, // 56: gateway.v1.GatewayService.CreatePayment:output_type -> gateway.v1.CreatePaymentResponse
+	22, // 57: gateway.v1.GatewayService.GetPaymentStatus:output_type -> gateway.v1.GetPaymentStatusResponse
+	24, // 58: gateway.v1.GatewayService.StreamMyLocation:output_type -> gateway.v1.StreamMyLocationResponse
+	48, // [48:59] is the sub-list for method output_type
+	37, // [37:48] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_gateway_v1_gateway_proto_init() }
