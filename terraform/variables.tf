@@ -12,5 +12,5 @@ variable "environment" {
 variable "project_name" {
   description = "Project name"
   type        = string
-  default     = "parkirpintar"
+  default     = "edysup-parkirpintar"
 }
