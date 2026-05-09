@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/edysupardi/parkirpintar/pkg/auth"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -21,6 +22,33 @@ type ExtraHandler struct {
 
 func NewExtra(db *pgxpool.Pool, validator *auth.Validator, serverKey string) *ExtraHandler {
 	return &ExtraHandler{db: db, validator: validator, serverKey: serverKey}
+}
+
+// CreateBookingFeeInvoice creates a booking_fee invoice and auto-settles payment.
+// Called by gateway during reservation flow.
+func (h *ExtraHandler) CreateBookingFeeInvoice(ctx context.Context, reservationID, driverID, idempotencyKey string) (invoiceID string, err error) {
+	invoiceID = uuid.New().String()
+	txID := uuid.New().String()
+	orderID := "PP-" + txID[:8]
+	now := time.Now()
+
+	_, err = h.db.Exec(ctx, `
+		INSERT INTO invoices (id, type, reservation_id, driver_id, booking_fee, total_amount, status, idempotency_key)
+		VALUES ($1, 'booking_fee', $2, $3, 5000, 5000, 'paid', $4)`,
+		invoiceID, reservationID, driverID, idempotencyKey)
+	if err != nil {
+		return "", fmt.Errorf("insert booking fee invoice: %w", err)
+	}
+
+	_, err = h.db.Exec(ctx, `
+		INSERT INTO transactions (id, invoice_id, driver_id, gateway_tx_id, payment_method, status, amount, idempotency_key, paid_at)
+		VALUES ($1, $2, $3, $4, 'QRIS', 'settled', 5000, $5, $6)`,
+		txID, invoiceID, driverID, orderID, "booking-"+idempotencyKey, now)
+	if err != nil {
+		return "", fmt.Errorf("insert booking fee transaction: %w", err)
+	}
+
+	return invoiceID, nil
 }
 
 // GET /v1/reservations/history

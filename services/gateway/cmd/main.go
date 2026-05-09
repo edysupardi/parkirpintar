@@ -80,14 +80,17 @@ func main() {
 	presenceConn := dial(fmt.Sprintf("%s:%d", cfg.Services.PresenceHost, cfg.Services.PresenceGRPCPort))
 	defer presenceConn.Close()
 
+	validator := auth.New(cfg.JWT.Secret)
+
+	extraH := handler.NewExtra(db.Pool(), validator, cfg.Midtrans.ServerKey)
+
 	h := handler.New(
 		reservationv1.NewReservationServiceClient(reservationConn),
 		billingv1.NewBillingServiceClient(billingConn),
 		paymentv1.NewPaymentServiceClient(paymentConn),
 		presencev1.NewPresenceServiceClient(presenceConn),
+		extraH,
 	)
-
-	validator := auth.New(cfg.JWT.Secret)
 
 	// gRPC server for direct gRPC clients (with auth interceptor)
 	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(validator.UnaryInterceptor))
@@ -124,7 +127,6 @@ func main() {
 	httpMux.HandleFunc("/v1/auth/login", authH.Login)
 
 	// extra endpoints
-	extraH := handler.NewExtra(db.Pool(), validator, cfg.Midtrans.ServerKey)
 	httpMux.HandleFunc("/v1/reservations/history", extraH.ReservationHistory)
 	httpMux.HandleFunc("/v1/parking/spots", extraH.ListAvailableSpots)
 	httpMux.HandleFunc("/v1/payments/simulate-settle", extraH.SimulateSettle)

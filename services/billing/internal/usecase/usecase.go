@@ -36,6 +36,7 @@ func (uc *BillingUsecase) GenerateInvoice(ctx context.Context, sessionID, reserv
 
 	inv := domain.Invoice{
 		InvoiceID:      uuid.New().String(),
+		Type:           domain.InvoiceTypeParkingSession,
 		SessionID:      sessionID,
 		ReservationID:  reservationID,
 		DriverID:       driverID,
@@ -53,6 +54,38 @@ func (uc *BillingUsecase) GenerateInvoice(ctx context.Context, sessionID, reserv
 
 	if err := uc.repo.InsertInvoice(ctx, inv); err != nil {
 		return nil, fmt.Errorf("insert invoice: %w", err)
+	}
+
+	if err := uc.idempotency.Save(ctx, "idempotency:"+idempotencyKey, inv.InvoiceID, idempotency.DefaultTTL); err != nil {
+		uc.log.Warn(ctx).Err(err).Msg("failed to save idempotency key")
+	}
+
+	return &inv, nil
+}
+
+func (uc *BillingUsecase) GenerateBookingFeeInvoice(ctx context.Context, reservationID, driverID, idempotencyKey string) (*domain.Invoice, error) {
+	_, hit, err := uc.idempotency.Check(ctx, "idempotency:"+idempotencyKey)
+	if err != nil {
+		return nil, fmt.Errorf("idempotency check: %w", err)
+	}
+	if hit {
+		return uc.repo.GetByIdempotencyKey(ctx, idempotencyKey)
+	}
+
+	inv := domain.Invoice{
+		InvoiceID:      uuid.New().String(),
+		Type:           domain.InvoiceTypeBookingFee,
+		ReservationID:  reservationID,
+		DriverID:       driverID,
+		BookingFee:     pricing.BookingFee,
+		TotalAmount:    pricing.BookingFee,
+		Status:         domain.InvoiceStatusPendingPayment,
+		IdempotencyKey: idempotencyKey,
+		CreatedAt:      time.Now(),
+	}
+
+	if err := uc.repo.InsertInvoice(ctx, inv); err != nil {
+		return nil, fmt.Errorf("insert booking fee invoice: %w", err)
 	}
 
 	if err := uc.idempotency.Save(ctx, "idempotency:"+idempotencyKey, inv.InvoiceID, idempotency.DefaultTTL); err != nil {

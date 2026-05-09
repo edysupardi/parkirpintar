@@ -6,16 +6,21 @@ import (
 )
 
 type InvoiceStatus string
+type InvoiceType string
 
 const (
 	InvoiceStatusDraft          InvoiceStatus = "draft"
 	InvoiceStatusPendingPayment InvoiceStatus = "pending_payment"
 	InvoiceStatusPaid           InvoiceStatus = "paid"
 	InvoiceStatusVoid           InvoiceStatus = "void"
+
+	InvoiceTypeBookingFee     InvoiceType = "booking_fee"
+	InvoiceTypeParkingSession InvoiceType = "parking_session"
 )
 
 type Invoice struct {
 	InvoiceID      string
+	Type           InvoiceType
 	SessionID      string
 	ReservationID  string
 	DriverID       string

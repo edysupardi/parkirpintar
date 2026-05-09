@@ -11,10 +11,13 @@ import (
 )
 
 type InvoiceStatus = domain.InvoiceStatus
+type InvoiceType = domain.InvoiceType
 
 const (
 	InvoiceStatusPendingPayment = domain.InvoiceStatusPendingPayment
 	InvoiceStatusPaid           = domain.InvoiceStatusPaid
+	InvoiceTypeBookingFee       = domain.InvoiceTypeBookingFee
+	InvoiceTypeParkingSession   = domain.InvoiceTypeParkingSession
 )
 
 type Invoice = domain.Invoice

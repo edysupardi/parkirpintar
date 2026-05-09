@@ -20,23 +20,30 @@ func New(pool *pgxpool.Pool) *PostgresRepository {
 }
 
 func (r *PostgresRepository) InsertInvoice(ctx context.Context, inv domain.Invoice) error {
+	var sessionID *string
+	if inv.SessionID != "" {
+		sessionID = &inv.SessionID
+	}
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO invoices
-			(id, session_id, reservation_id, driver_id, booking_fee, parking_fee,
+			(id, type, session_id, reservation_id, driver_id, booking_fee, parking_fee,
 			 overnight_fee, total_amount, billed_hours, is_overnight, duration_mins,
 			 status, idempotency_key)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-		inv.InvoiceID, inv.SessionID, inv.ReservationID, inv.DriverID,
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+		inv.InvoiceID, string(inv.Type), sessionID, inv.ReservationID, inv.DriverID,
 		inv.BookingFee, inv.ParkingFee, inv.OvernightFee, inv.TotalAmount,
 		inv.BilledHours, inv.IsOvernight, inv.DurationMins,
 		string(inv.Status), inv.IdempotencyKey,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("insert invoice: %w", err)
+	}
+	return nil
 }
 
 func (r *PostgresRepository) GetInvoice(ctx context.Context, invoiceID string) (*domain.Invoice, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, session_id, reservation_id, driver_id, booking_fee, parking_fee,
+		SELECT id, type, session_id, reservation_id, driver_id, booking_fee, parking_fee,
 		       overnight_fee, total_amount, billed_hours, is_overnight, duration_mins,
 		       status, gateway_tx_id, payment_method, idempotency_key, created_at, paid_at
 		FROM invoices WHERE id = $1`, invoiceID)
@@ -45,7 +52,7 @@ func (r *PostgresRepository) GetInvoice(ctx context.Context, invoiceID string) (
 
 func (r *PostgresRepository) GetInvoiceBySession(ctx context.Context, sessionID string) (*domain.Invoice, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, session_id, reservation_id, driver_id, booking_fee, parking_fee,
+		SELECT id, type, session_id, reservation_id, driver_id, booking_fee, parking_fee,
 		       overnight_fee, total_amount, billed_hours, is_overnight, duration_mins,
 		       status, gateway_tx_id, payment_method, idempotency_key, created_at, paid_at
 		FROM invoices WHERE session_id = $1`, sessionID)
@@ -54,7 +61,7 @@ func (r *PostgresRepository) GetInvoiceBySession(ctx context.Context, sessionID 
 
 func (r *PostgresRepository) GetByIdempotencyKey(ctx context.Context, key string) (*domain.Invoice, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, session_id, reservation_id, driver_id, booking_fee, parking_fee,
+		SELECT id, type, session_id, reservation_id, driver_id, booking_fee, parking_fee,
 		       overnight_fee, total_amount, billed_hours, is_overnight, duration_mins,
 		       status, gateway_tx_id, payment_method, idempotency_key, created_at, paid_at
 		FROM invoices WHERE idempotency_key = $1`, key)
@@ -76,10 +83,10 @@ type scanner interface {
 
 func scanInvoice(row scanner) (*domain.Invoice, error) {
 	var inv domain.Invoice
-	var status string
-	var gatewayTxID, paymentMethod *string
+	var status, invType string
+	var sessionID, gatewayTxID, paymentMethod *string
 	err := row.Scan(
-		&inv.InvoiceID, &inv.SessionID, &inv.ReservationID, &inv.DriverID,
+		&inv.InvoiceID, &invType, &sessionID, &inv.ReservationID, &inv.DriverID,
 		&inv.BookingFee, &inv.ParkingFee, &inv.OvernightFee, &inv.TotalAmount,
 		&inv.BilledHours, &inv.IsOvernight, &inv.DurationMins,
 		&status, &gatewayTxID, &paymentMethod, &inv.IdempotencyKey,
@@ -92,6 +99,10 @@ func scanInvoice(row scanner) (*domain.Invoice, error) {
 		return nil, fmt.Errorf("scan invoice: %w", err)
 	}
 	inv.Status = domain.InvoiceStatus(status)
+	inv.Type = domain.InvoiceType(invType)
+	if sessionID != nil {
+		inv.SessionID = *sessionID
+	}
 	if gatewayTxID != nil {
 		inv.GatewayTxID = *gatewayTxID
 	}

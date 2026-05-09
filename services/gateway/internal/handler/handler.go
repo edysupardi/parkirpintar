@@ -22,6 +22,7 @@ type GatewayHandler struct {
 	billing     billingv1.BillingServiceClient
 	payment     paymentv1.PaymentServiceClient
 	presence    presencev1.PresenceServiceClient
+	extra       *ExtraHandler
 }
 
 func New(
@@ -29,12 +30,14 @@ func New(
 	billing billingv1.BillingServiceClient,
 	payment paymentv1.PaymentServiceClient,
 	presence presencev1.PresenceServiceClient,
+	extra *ExtraHandler,
 ) *GatewayHandler {
 	return &GatewayHandler{
 		reservation: reservation,
 		billing:     billing,
 		payment:     payment,
 		presence:    presence,
+		extra:       extra,
 	}
 }
 
@@ -70,9 +73,16 @@ func (h *GatewayHandler) CreateReservation(ctx context.Context, req *gatewayv1.C
 		return nil, err
 	}
 
-	// Booking fee 5.000 is charged upfront (non-refundable commitment fee).
-	// In production super app, this would debit the linked wallet.
-	// Here we acknowledge it in the response — the fee is implicit in the reservation confirmation.
+	// Charge booking fee 5.000 upfront — create invoice + auto-settle transaction
+	_, err = h.extra.CreateBookingFeeInvoice(ctx, resp.ReservationId, driverID, "booking-"+req.IdempotencyKey)
+	if err != nil {
+		// payment failed — cancel reservation and release spot
+		_, _ = h.reservation.CancelReservation(ctx, &reservationv1.CancelReservationRequest{
+			ReservationId: resp.ReservationId,
+			DriverId:      driverID,
+		})
+		return nil, status.Errorf(codes.FailedPrecondition, "booking fee payment failed: %v", err)
+	}
 
 	return &gatewayv1.CreateReservationResponse{
 		ReservationId: resp.ReservationId,
