@@ -24,31 +24,73 @@ func NewExtra(db *pgxpool.Pool, validator *auth.Validator, serverKey string) *Ex
 	return &ExtraHandler{db: db, validator: validator, serverKey: serverKey}
 }
 
-// CreateBookingFeeInvoice creates a booking_fee invoice and auto-settles payment.
+// CreateBookingFeeInvoice creates a booking_fee invoice (pending payment).
 // Called by gateway during reservation flow.
 func (h *ExtraHandler) CreateBookingFeeInvoice(ctx context.Context, reservationID, driverID, idempotencyKey string) (invoiceID string, err error) {
 	invoiceID = uuid.New().String()
-	txID := uuid.New().String()
-	orderID := "PP-" + txID[:8]
-	now := time.Now()
 
 	_, err = h.db.Exec(ctx, `
 		INSERT INTO invoices (id, type, reservation_id, driver_id, booking_fee, total_amount, status, idempotency_key)
-		VALUES ($1, 'booking_fee', $2, $3, 5000, 5000, 'paid', $4)`,
+		VALUES ($1, 'booking_fee', $2, $3, 5000, 5000, 'pending_payment', $4)`,
 		invoiceID, reservationID, driverID, idempotencyKey)
 	if err != nil {
 		return "", fmt.Errorf("insert booking fee invoice: %w", err)
 	}
 
-	_, err = h.db.Exec(ctx, `
-		INSERT INTO transactions (id, invoice_id, driver_id, gateway_tx_id, payment_method, status, amount, idempotency_key, paid_at)
-		VALUES ($1, $2, $3, $4, 'QRIS', 'settled', 5000, $5, $6)`,
-		txID, invoiceID, driverID, orderID, "booking-"+idempotencyKey, now)
-	if err != nil {
-		return "", fmt.Errorf("insert booking fee transaction: %w", err)
+	return invoiceID, nil
+}
+
+// ConfirmBookingPayment is called after payment is settled — confirms the reservation.
+// POST /v1/reservations/confirm-payment
+func (h *ExtraHandler) ConfirmBookingPayment(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user id")
+		return
+	}
+	_ = userID
+
+	var req struct {
+		TransactionID string `json:"transaction_id"`
+		ReservationID string `json:"reservation_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.TransactionID == "" || req.ReservationID == "" {
+		writeError(w, http.StatusBadRequest, "transaction_id and reservation_id are required")
+		return
 	}
 
-	return invoiceID, nil
+	// verify transaction is settled
+	var txStatus string
+	err := h.db.QueryRow(context.Background(),
+		`SELECT status FROM transactions WHERE id = $1`, req.TransactionID,
+	).Scan(&txStatus)
+	if err != nil || txStatus != "settled" {
+		writeError(w, http.StatusBadRequest, "payment not settled yet")
+		return
+	}
+
+	// mark invoice as paid
+	now := time.Now()
+	_, _ = h.db.Exec(context.Background(),
+		`UPDATE invoices SET status = 'paid', paid_at = $1 WHERE reservation_id = $2 AND type = 'booking_fee'`,
+		now, req.ReservationID)
+
+	// confirm reservation (PENDING → CONFIRMED, extend hold to 1 hour)
+	expiresAt := now.Add(1 * time.Hour)
+	_, err = h.db.Exec(context.Background(),
+		`UPDATE reservations SET status = 'confirmed', confirmed_at = $1, expires_at = $2 WHERE id = $3 AND status = 'pending'`,
+		now, expiresAt, req.ReservationID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to confirm reservation")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"reservation_id": req.ReservationID,
+		"status":         "confirmed",
+		"confirmed_at":   now,
+		"expires_at":     expiresAt,
+	})
 }
 
 // GET /v1/reservations/history

@@ -70,7 +70,7 @@ func (uc *ReservationUsecase) CreateReservation(ctx context.Context, driverID, i
 	reservationID := uuid.New().String()
 	lockKey := spotLockKey(spot.SpotID)
 
-	ok, err := uc.locker.Acquire(ctx, lockKey, reservationID, domain.HoldDuration)
+	ok, err := uc.locker.Acquire(ctx, lockKey, reservationID, domain.PaymentTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("acquire lock: %w", err)
 	}
@@ -83,10 +83,10 @@ func (uc *ReservationUsecase) CreateReservation(ctx context.Context, driverID, i
 		ReservationID:  reservationID,
 		DriverID:       driverID,
 		Spot:           *spot,
-		Status:         domain.StatusConfirmed,
+		Status:         domain.StatusPending,
 		AssignmentMode: mode,
 		ConfirmedAt:    now,
-		ExpiresAt:      now.Add(domain.HoldDuration),
+		ExpiresAt:      now.Add(domain.PaymentTimeout),
 		IdempotencyKey: idempotencyKey,
 	}
 
@@ -99,11 +99,37 @@ func (uc *ReservationUsecase) CreateReservation(ctx context.Context, driverID, i
 		uc.log.Warn(ctx).Err(err).Msg("failed to save idempotency key")
 	}
 
-	if err := uc.publisher.PublishReservationConfirmed(ctx, r); err != nil {
+	return &r, nil
+}
+
+func (uc *ReservationUsecase) ConfirmReservation(ctx context.Context, reservationID string) (*domain.Reservation, error) {
+	r, err := uc.repo.GetReservation(ctx, reservationID)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation: %w", err)
+	}
+	if r.Status != domain.StatusPending {
+		return nil, fmt.Errorf("cannot confirm: status is %s", r.Status)
+	}
+
+	now := time.Now()
+	expiresAt := now.Add(domain.HoldDuration)
+	if err := uc.repo.UpdateConfirmed(ctx, reservationID, now, expiresAt); err != nil {
+		return nil, fmt.Errorf("update confirmed: %w", err)
+	}
+
+	// extend lock TTL to full hold duration
+	lockKey := spotLockKey(r.Spot.SpotID)
+	_, _ = uc.locker.Acquire(ctx, lockKey, reservationID, domain.HoldDuration)
+
+	r.Status = domain.StatusConfirmed
+	r.ConfirmedAt = now
+	r.ExpiresAt = expiresAt
+
+	if err := uc.publisher.PublishReservationConfirmed(ctx, *r); err != nil {
 		uc.log.Warn(ctx).Err(err).Msg("failed to publish ReservationConfirmed")
 	}
 
-	return &r, nil
+	return r, nil
 }
 
 func (uc *ReservationUsecase) CancelReservation(ctx context.Context, reservationID, driverID string) (*domain.Reservation, int64, error) {

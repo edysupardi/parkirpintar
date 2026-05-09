@@ -23,7 +23,8 @@ const (
 	StatusCancelled ReservationStatus = "cancelled"
 	StatusExpired   ReservationStatus = "expired"
 
-	HoldDuration = 1 * time.Hour
+	HoldDuration   = 1 * time.Hour
+	PaymentTimeout = 5 * time.Minute
 )
 
 type Spot struct {
@@ -54,6 +55,7 @@ type Repository interface {
 	GetActiveReservation(ctx context.Context, driverID string) (*Reservation, error)
 	GetByIdempotencyKey(ctx context.Context, key string) (*Reservation, error)
 	UpdateStatus(ctx context.Context, reservationID string, status ReservationStatus) error
+	UpdateConfirmed(ctx context.Context, reservationID string, confirmedAt time.Time, expiresAt time.Time) error
 	UpdateCheckIn(ctx context.Context, reservationID, sessionID string, checkInAt time.Time) error
 	UpdateCheckOut(ctx context.Context, reservationID string, checkOutAt time.Time) error
 	UpdateCancelled(ctx context.Context, reservationID string, cancelledAt time.Time) error

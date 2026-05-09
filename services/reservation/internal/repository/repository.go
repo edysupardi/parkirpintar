@@ -76,6 +76,13 @@ func (r *PostgresRepository) UpdateStatus(ctx context.Context, reservationID str
 	return err
 }
 
+func (r *PostgresRepository) UpdateConfirmed(ctx context.Context, reservationID string, confirmedAt time.Time, expiresAt time.Time) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE reservations SET status = 'confirmed', confirmed_at = $1, expires_at = $2 WHERE id = $3`,
+		confirmedAt, expiresAt, reservationID)
+	return err
+}
+
 func (r *PostgresRepository) UpdateCheckIn(ctx context.Context, reservationID, sessionID string, checkInAt time.Time) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE reservations SET status = 'active', session_id = $1, check_in_at = $2 WHERE id = $3`,

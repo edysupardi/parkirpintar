@@ -73,10 +73,25 @@ func (h *GatewayHandler) CreateReservation(ctx context.Context, req *gatewayv1.C
 		return nil, err
 	}
 
-	// Charge booking fee 5.000 upfront — create invoice + auto-settle transaction
-	_, err = h.extra.CreateBookingFeeInvoice(ctx, resp.ReservationId, driverID, "booking-"+req.IdempotencyKey)
+	// Create booking fee invoice + QRIS payment
+	invoiceID, err := h.extra.CreateBookingFeeInvoice(ctx, resp.ReservationId, driverID, "booking-"+req.IdempotencyKey)
 	if err != nil {
-		// payment failed — cancel reservation and release spot
+		_, _ = h.reservation.CancelReservation(ctx, &reservationv1.CancelReservationRequest{
+			ReservationId: resp.ReservationId,
+			DriverId:      driverID,
+		})
+		return nil, status.Errorf(codes.FailedPrecondition, "booking fee invoice failed: %v", err)
+	}
+
+	// Create QRIS payment via payment service
+	payResp, err := h.payment.CreateTransaction(ctx, &paymentv1.CreateTransactionRequest{
+		InvoiceId:      invoiceID,
+		DriverId:       driverID,
+		Amount:         &commonv1.Money{Amount: 5000, Currency: "IDR"},
+		PaymentMethod:  commonv1.PaymentMethod_PAYMENT_METHOD_QRIS,
+		IdempotencyKey: "pay-booking-" + req.IdempotencyKey,
+	})
+	if err != nil {
 		_, _ = h.reservation.CancelReservation(ctx, &reservationv1.CancelReservationRequest{
 			ReservationId: resp.ReservationId,
 			DriverId:      driverID,
@@ -94,7 +109,7 @@ func (h *GatewayHandler) CreateReservation(ctx context.Context, req *gatewayv1.C
 		Navigation: &gatewayv1.SpotNavigation{
 			Floor:      resp.Spot.Floor,
 			SpotNumber: resp.Spot.Number,
-			Direction:  buildDirection(resp.Spot.Floor, resp.Spot.Number),
+			Direction:  payResp.QrString + "|" + payResp.TransactionId,
 		},
 	}, nil
 }
