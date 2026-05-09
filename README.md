@@ -200,21 +200,22 @@ flowchart LR
 stateDiagram-v2
     [*] --> PENDING : Driver reserves
 
-    PENDING --> CONFIRMED : System validates\nand locks inventory
+    PENDING --> CONFIRMED : Booking fee 5.000 charged\nspot locked
+
+    PENDING --> FAILED : Payment failed\nspot not locked
 
     CONFIRMED --> ACTIVE : Driver check-in\nmanual
 
-    CONFIRMED --> EXPIRED : No check-in within 1 hour\nfee 5.000 IDR
+    CONFIRMED --> EXPIRED : No check-in within 1 hour\nbooking fee forfeited
 
-    CONFIRMED --> CANCELLED : Cancel within 2 minutes\nfee 0 IDR
+    CONFIRMED --> CANCELLED : Driver cancels\nbooking fee forfeited
 
-    CONFIRMED --> CANCELLED : Cancel after 2 minutes\nfee 5.000 IDR
-
-    ACTIVE --> COMPLETED : Driver checkout\ninvoice generated
+    ACTIVE --> COMPLETED : Driver checkout\ninvoice generated (parking + overnight only)
 
     EXPIRED --> [*]
     CANCELLED --> [*]
     COMPLETED --> [*]
+    FAILED --> [*]
 ```
 
 ---
@@ -292,32 +293,40 @@ stateDiagram-v2
 
 | Rule | Value |
 |------|-------|
-| Booking fee | 5.000 IDR — charged saat reservation confirmed |
+| Booking fee | 5.000 IDR — charged upfront saat reservation (non-refundable) |
 | Hourly rate | 5.000 IDR/jam — first hour + each **started** hour |
 | Overnight fee | 20.000 IDR flat — jika session crossing midnight WIB |
 | Overstay | Tidak ada penalty — billing normal (hourly rate) |
 
-**Cancellation fee:**
+**Booking fee = commitment fee:**
+- Charged saat reserve, sebelum spot di-lock
+- Non-refundable dalam kondisi apapun (cancel, no-show, expire)
+- Menjamin revenue owner meskipun driver tidak datang
+- Tidak masuk invoice checkout — invoice hanya parking + overnight
 
-| Kondisi | Fee |
-|---------|-----|
-| Cancel < 2 menit setelah konfirmasi | 0 IDR |
-| Cancel > 2 menit, sebelum check-in | 5.000 IDR |
-| No-show > 1 jam tidak check-in | 0 IDR + auto-expire (booking fee 5.000 sudah dibayar saat confirmed) |
+**Cancellation policy:**
+
+| Kondisi | Additional Fee |
+|---------|---------------|
+| Cancel kapanpun | 0 IDR (booking fee 5.000 sudah hangus) |
+| No-show > 1 jam | 0 IDR + auto-expire (booking fee sudah hangus) |
 
 **Contoh kalkulasi:**
 
 ```
 Park 1j 1m:
+  booking fee  = 5.000 IDR (charged at reserve)
   parking fee  = ceil(61/60) = 2 jam × 5.000 = 10.000 IDR
-  booking fee  = 5.000 IDR
-  total        = 15.000 IDR
+  total invoice at checkout = 10.000 IDR
 
 Park 23:00 – 01:00:
+  booking fee  = 5.000 IDR (charged at reserve)
   parking fee  = 2 jam × 5.000 = 10.000 IDR
   overnight    = 20.000 IDR
-  booking fee  = 5.000 IDR
-  total        = 35.000 IDR
+  total invoice at checkout = 30.000 IDR
+
+Total revenue owner (park 23:00-01:00):
+  booking fee + invoice = 5.000 + 30.000 = 35.000 IDR
 ```
 
 ---
@@ -518,18 +527,18 @@ Path-based trigger: hanya service yang berubah yang di-build ulang.
 
 | Rule | Value |
 |------|-------|
-| Booking fee | 5.000 IDR (saat reservation confirmed) |
+| Booking fee | 5.000 IDR (charged upfront saat reserve, non-refundable) |
 | Hourly rate | 5.000 IDR/jam (first + each started hour) |
 | Overnight fee | 20.000 IDR flat (crossing midnight WIB) |
 | Overstay penalty | Tidak ada - billing normal |
+| Invoice at checkout | Parking + overnight only (booking fee sudah dibayar) |
 
 ### Cancellation Policy
 
-| Kondisi | Fee |
-|---------|-----|
-| < 2 menit setelah konfirmasi | 0 IDR |
-| > 2 menit, sebelum check-in | 5.000 IDR |
-| No-show (> 1 jam tidak check-in) | 5.000 IDR + auto-expire |
+| Kondisi | Additional Fee |
+|---------|---------------|
+| Cancel kapanpun | 0 IDR (booking fee 5.000 sudah hangus sebagai commitment) |
+| No-show (> 1 jam tidak check-in) | 0 IDR + auto-expire (booking fee sudah hangus) |
 
 ### Reservation Rules
 
@@ -576,22 +585,22 @@ Payment webhook → Billing MarkPaid flow
 Event publishing dan consuming via RabbitMQ
 ```
 
-### End-to-End Scenarios
+### End-to-End Scenarios (All Implemented & Passing)
 
-| # | Skenario |
-|---|----------|
-| E2E-01 | Happy path reservation → check-in → check-out → pay |
-| E2E-02 | Double-book prevention - spot sama ditolak |
-| E2E-03 | User-selected spot contention - queue mechanism |
-| E2E-04 | Reservation expiry (no-show) - auto-expire, booking fee forfeited, no extra charge |
-| E2E-05 | Cancellation < 2 menit - fee 0 IDR |
-| E2E-06 | Cancellation > 2 menit - fee 5.000 IDR |
-| E2E-07 | Extended stay (overstay) - normal rate, no penalty |
-| E2E-08 | Overnight fee - crossing midnight +20.000 IDR |
-| E2E-09 | Payment QRIS - success |
-| E2E-10 | Payment QRIS - failure |
-| E2E-11 | Payment Virtual Account - VA number + polling fallback |
-| E2E-12 | Duplicate webhook - idempotent, no double-charge |
+| # | Skenario | Status |
+|---|----------|--------|
+| E2E-01 | Happy path reservation → check-in → check-out → pay | ✅ |
+| E2E-02 | Double-book prevention - spot sama ditolak | ✅ |
+| E2E-03 | User-selected spot contention - lock mechanism | ✅ |
+| E2E-04 | Reservation expiry (no-show) - auto-expire, booking fee forfeited, no extra charge | ✅ |
+| E2E-05 | Cancellation < 2 menit - fee 0 IDR | ✅ |
+| E2E-06 | Cancellation > 2 menit - fee 5.000 IDR | ✅ |
+| E2E-07 | Extended stay (overstay) - normal rate, no penalty | ✅ |
+| E2E-08 | Overnight fee - crossing midnight +20.000 IDR | ✅ |
+| E2E-09 | Payment QRIS - success | ✅ |
+| E2E-10 | Payment QRIS - failure | ✅ |
+| E2E-11 | Payment Virtual Account - VA number + settlement | ✅ |
+| E2E-12 | Duplicate webhook - idempotent, no double-charge | ✅ |
 
 ---
 
@@ -659,9 +668,14 @@ make run-all
 
 ```bash
 make test-unit          # unit tests (pkg/)
-make test-integration   # integration tests
-make test-e2e           # semua 13 e2e scenarios
+make test-integration   # integration tests (requires Docker)
+make test-e2e           # semua 12 e2e scenarios (requires Docker)
 make test-coverage      # coverage report → coverage.html
+
+# Manual run with build tags:
+go test ./pkg/... -v                                    # unit tests
+go test -tags integration ./tests/integration/... -v    # integration
+go test -tags e2e ./tests/e2e/... -v                    # e2e
 ```
 
 ### Environment Variables
