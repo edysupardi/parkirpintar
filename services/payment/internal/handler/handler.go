@@ -35,7 +35,7 @@ func (h *PaymentHandler) CreateTransaction(ctx context.Context, req *paymentv1.C
 
 	tx, err := h.uc.CreateTransaction(ctx,
 		req.InvoiceId, req.DriverId, req.IdempotencyKey,
-		req.PaymentMethod.String(), req.Amount.Amount, customer,
+		protoToPaymentMethod(req.PaymentMethod), req.Amount.Amount, customer,
 	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "%v", err)
@@ -124,5 +124,28 @@ func domainStatusToProto(s domain.TransactionStatus) paymentv1.TransactionStatus
 		return paymentv1.TransactionStatus_TRANSACTION_STATUS_REFUNDED
 	default:
 		return paymentv1.TransactionStatus_TRANSACTION_STATUS_PENDING
+	}
+}
+
+func protoToPaymentMethod(m commonv1.PaymentMethod) string {
+	switch m {
+	case commonv1.PaymentMethod_PAYMENT_METHOD_QRIS:
+		return "QRIS"
+	case commonv1.PaymentMethod_PAYMENT_METHOD_GOPAY:
+		return "GOPAY"
+	case commonv1.PaymentMethod_PAYMENT_METHOD_OVO:
+		return "OVO"
+	case commonv1.PaymentMethod_PAYMENT_METHOD_DANA:
+		return "DANA"
+	case commonv1.PaymentMethod_PAYMENT_METHOD_VA_BCA:
+		return "VA_BCA"
+	case commonv1.PaymentMethod_PAYMENT_METHOD_VA_BNI:
+		return "VA_BNI"
+	case commonv1.PaymentMethod_PAYMENT_METHOD_VA_BRI:
+		return "VA_BRI"
+	case commonv1.PaymentMethod_PAYMENT_METHOD_VA_MANDIRI:
+		return "VA_MANDIRI"
+	default:
+		return m.String()
 	}
 }

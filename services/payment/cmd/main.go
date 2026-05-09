@@ -9,11 +9,11 @@ import (
 	"syscall"
 
 	paymentv1 "github.com/edysupardi/parkirpintar/gen/payment/v1"
-	"github.com/edysupardi/parkirpintar/pkg/auth"
 	"github.com/edysupardi/parkirpintar/pkg/config"
 	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/idempotency"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
+	"github.com/edysupardi/parkirpintar/services/payment/internal/domain"
 	"github.com/edysupardi/parkirpintar/services/payment/internal/gateway"
 	"github.com/edysupardi/parkirpintar/services/payment/internal/handler"
 	"github.com/edysupardi/parkirpintar/services/payment/internal/repository"
@@ -56,17 +56,25 @@ func main() {
 
 	repo := repository.New(db.Pool())
 	idempotencyStore := idempotency.New(rdb)
-	gw := gateway.NewMidtrans(cfg.Midtrans.ServerKey, cfg.Midtrans.Env == "production")
+
+	var gw domain.PaymentGateway
+	if cfg.Feature.PaymentProvider == "mock" {
+		gw = gateway.NewMock(cfg.Midtrans.ServerKey)
+		log.Info(ctx).Msg("using mock payment gateway")
+	} else {
+		gw = gateway.NewMidtrans(cfg.Midtrans.ServerKey, cfg.Midtrans.Env == "production")
+		log.Info(ctx).Msg("using midtrans payment gateway")
+	}
 	uc := usecase.New(repo, gw, idempotencyStore, cfg.Midtrans.ServerKey, log)
 
-	validator := auth.New(cfg.JWT.Secret)
-	srv := grpc.NewServer(grpc.UnaryInterceptor(validator.UnaryInterceptor))
+	
+	srv := grpc.NewServer()
 
 	paymentv1.RegisterPaymentServiceServer(srv, handler.New(uc))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())
 	reflection.Register(srv)
 
-	addr := fmt.Sprintf(":%d", 50053)
+	addr := fmt.Sprintf(":%d", cfg.Services.PaymentGRPCPort)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(ctx).Err(err).Msg("failed to listen")
