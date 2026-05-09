@@ -57,7 +57,7 @@ func main() {
 	uc := usecase.New(repo, idempotencyStore, log)
 
 	
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.UnaryServerLogger(log)))
 
 	billingv1.RegisterBillingServiceServer(srv, handler.New(uc))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())

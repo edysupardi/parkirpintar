@@ -146,7 +146,7 @@ func main() {
 	limiter := handler.NewRateLimiter(100, 1*time.Minute)
 	httpSrv := &http.Server{
 		Addr:              httpAddr,
-		Handler:           limiter.Middleware(corsMiddleware(validator.HTTPMiddleware(httpMux))),
+		Handler:           logger.HTTPRequestLogger(log)(limiter.Middleware(corsMiddleware(validator.HTTPMiddleware(httpMux)))),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

@@ -83,7 +83,7 @@ func main() {
 	go runExpiryJob(ctx, uc, log)
 
 	// gRPC server — no auth here, gateway is the auth boundary
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.UnaryServerLogger(log)))
 
 	reservationv1.RegisterReservationServiceServer(srv, handler.New(uc))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())

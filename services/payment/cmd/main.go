@@ -68,7 +68,7 @@ func main() {
 	uc := usecase.New(repo, gw, idempotencyStore, cfg.Midtrans.ServerKey, log)
 
 	
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.UnaryServerLogger(log)))
 
 	paymentv1.RegisterPaymentServiceServer(srv, handler.New(uc))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())

@@ -5,18 +5,31 @@ import (
 	"io"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
 type contextKey string
 
-const traceIDKey contextKey = "trace_id"
+const (
+	traceIDKey   contextKey = "trace_id"
+	requestIDKey contextKey = "request_id"
+	userIDKey    contextKey = "user_id"
+)
+
+var sensitiveFields = map[string]bool{
+	"password":      true,
+	"password_hash": true,
+	"token":         true,
+	"secret":        true,
+	"authorization": true,
+}
 
 type Config struct {
 	Service string
-	Level   string    // "debug", "info", "warn", "error"
-	Pretty  bool      // true = human-readable (dev), false = JSON (prod)
-	Output  io.Writer // nil = os.Stdout
+	Level   string
+	Pretty  bool
+	Output  io.Writer
 }
 
 type Logger interface {
@@ -58,15 +71,62 @@ func New(cfg Config) Logger {
 	return &logger{zl: zl}
 }
 
-// WithTraceID stores a trace ID in the context.
-// When OTel is integrated, this will be replaced by OTel span context extraction.
+func GenerateRequestID() string {
+	return uuid.New().String()
+}
+
+func WithRequestID(ctx context.Context, requestID string) context.Context {
+	return context.WithValue(ctx, requestIDKey, requestID)
+}
+
+func RequestIDFromContext(ctx context.Context) string {
+	if id, ok := ctx.Value(requestIDKey).(string); ok {
+		return id
+	}
+	return ""
+}
+
+func WithUserID(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, userIDKey, userID)
+}
+
+func UserIDFromContext(ctx context.Context) string {
+	if id, ok := ctx.Value(userIDKey).(string); ok {
+		return id
+	}
+	return ""
+}
+
+// WithTraceID stores a trace ID in the context (legacy, alias for WithRequestID).
 func WithTraceID(ctx context.Context, traceID string) context.Context {
 	return context.WithValue(ctx, traceIDKey, traceID)
+}
+
+func IsSensitiveField(field string) bool {
+	return sensitiveFields[field]
+}
+
+func MaskSensitive(fields map[string]any) map[string]any {
+	masked := make(map[string]any, len(fields))
+	for k, v := range fields {
+		if sensitiveFields[k] {
+			masked[k] = "[REDACTED]"
+		} else {
+			masked[k] = v
+		}
+	}
+	return masked
 }
 
 func (l *logger) event(ctx context.Context, e *zerolog.Event) *zerolog.Event {
 	if traceID, ok := ctx.Value(traceIDKey).(string); ok && traceID != "" {
 		e = e.Str("trace_id", traceID)
+	}
+	if requestID, ok := ctx.Value(requestIDKey).(string); ok && requestID != "" {
+		e = e.Str("request_id", requestID)
+	}
+	if userID, ok := ctx.Value(userIDKey).(string); ok && userID != "" {
+		e = e.Str("user_id", userID)
 	}
 	return e
 }

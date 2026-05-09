@@ -36,7 +36,7 @@ func main() {
 	_ = cfg // cfg used when real FCM/SES providers are wired
 
 	
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.UnaryServerLogger(log)))
 
 	notificationv1.RegisterNotificationServiceServer(srv, handler.New(push, email, log))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())

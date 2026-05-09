@@ -49,7 +49,7 @@ func main() {
 	repo := repository.New(db.Pool())
 
 	
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.UnaryServerLogger(log)))
 
 	presencev1.RegisterPresenceServiceServer(srv, handler.New(repo, log))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())
