@@ -199,6 +199,8 @@ func (uc *ReservationUsecase) CheckOut(ctx context.Context, reservationID, drive
 		return nil, fmt.Errorf("update check-out: %w", err)
 	}
 
+	_ = uc.locker.Release(ctx, spotLockKey(r.Spot.SpotID), reservationID)
+
 	if err := uc.idempotency.Save(ctx, "idempotency:"+idempotencyKey, reservationID, idempotency.DefaultTTL); err != nil {
 		uc.log.Warn(ctx).Err(err).Msg("failed to save idempotency key")
 	}
