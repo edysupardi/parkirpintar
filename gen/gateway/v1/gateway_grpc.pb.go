@@ -36,23 +36,27 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type GatewayServiceClient interface {
-	// ── Parking Area ──────────────────────────────────────
-	// Cek ketersediaan spot (sebelum reserve)
+	// GET /v1/parking/availability?vehicle_type=CAR
 	GetParkingAvailability(ctx context.Context, in *GetParkingAvailabilityRequest, opts ...grpc.CallOption) (*GetParkingAvailabilityResponse, error)
-	// ── Reservation ───────────────────────────────────────
+	// POST /v1/reservations
 	CreateReservation(ctx context.Context, in *CreateReservationRequest, opts ...grpc.CallOption) (*CreateReservationResponse, error)
+	// GET /v1/reservations/me
 	GetMyReservation(ctx context.Context, in *GetMyReservationRequest, opts ...grpc.CallOption) (*GetMyReservationResponse, error)
+	// DELETE /v1/reservations/{reservation_id}
 	CancelReservation(ctx context.Context, in *CancelReservationRequest, opts ...grpc.CallOption) (*CancelReservationResponse, error)
+	// POST /v1/reservations/{reservation_id}/check-in
 	CheckIn(ctx context.Context, in *CheckInRequest, opts ...grpc.CallOption) (*CheckInResponse, error)
+	// POST /v1/reservations/{reservation_id}/check-out
 	CheckOut(ctx context.Context, in *CheckOutRequest, opts ...grpc.CallOption) (*CheckOutResponse, error)
-	// ── Billing ───────────────────────────────────────────
+	// GET /v1/invoices/{invoice_id}
 	GetInvoice(ctx context.Context, in *GetInvoiceRequest, opts ...grpc.CallOption) (*GetInvoiceResponse, error)
+	// GET /v1/billing/preview?session_id=xxx
 	PreviewBilling(ctx context.Context, in *PreviewBillingRequest, opts ...grpc.CallOption) (*PreviewBillingResponse, error)
-	// ── Payment ───────────────────────────────────────────
+	// POST /v1/payments
 	CreatePayment(ctx context.Context, in *CreatePaymentRequest, opts ...grpc.CallOption) (*CreatePaymentResponse, error)
+	// GET /v1/payments/{transaction_id}
 	GetPaymentStatus(ctx context.Context, in *GetPaymentStatusRequest, opts ...grpc.CallOption) (*GetPaymentStatusResponse, error)
-	// ── Presence ──────────────────────────────────────────
-	// Streaming lokasi dari mobile app
+	// Streaming — tidak support HTTP/1.1, skip annotation
 	StreamMyLocation(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[StreamMyLocationRequest, StreamMyLocationResponse], error)
 }
 
@@ -181,23 +185,27 @@ type GatewayService_StreamMyLocationClient = grpc.BidiStreamingClient[StreamMyLo
 // All implementations must embed UnimplementedGatewayServiceServer
 // for forward compatibility.
 type GatewayServiceServer interface {
-	// ── Parking Area ──────────────────────────────────────
-	// Cek ketersediaan spot (sebelum reserve)
+	// GET /v1/parking/availability?vehicle_type=CAR
 	GetParkingAvailability(context.Context, *GetParkingAvailabilityRequest) (*GetParkingAvailabilityResponse, error)
-	// ── Reservation ───────────────────────────────────────
+	// POST /v1/reservations
 	CreateReservation(context.Context, *CreateReservationRequest) (*CreateReservationResponse, error)
+	// GET /v1/reservations/me
 	GetMyReservation(context.Context, *GetMyReservationRequest) (*GetMyReservationResponse, error)
+	// DELETE /v1/reservations/{reservation_id}
 	CancelReservation(context.Context, *CancelReservationRequest) (*CancelReservationResponse, error)
+	// POST /v1/reservations/{reservation_id}/check-in
 	CheckIn(context.Context, *CheckInRequest) (*CheckInResponse, error)
+	// POST /v1/reservations/{reservation_id}/check-out
 	CheckOut(context.Context, *CheckOutRequest) (*CheckOutResponse, error)
-	// ── Billing ───────────────────────────────────────────
+	// GET /v1/invoices/{invoice_id}
 	GetInvoice(context.Context, *GetInvoiceRequest) (*GetInvoiceResponse, error)
+	// GET /v1/billing/preview?session_id=xxx
 	PreviewBilling(context.Context, *PreviewBillingRequest) (*PreviewBillingResponse, error)
-	// ── Payment ───────────────────────────────────────────
+	// POST /v1/payments
 	CreatePayment(context.Context, *CreatePaymentRequest) (*CreatePaymentResponse, error)
+	// GET /v1/payments/{transaction_id}
 	GetPaymentStatus(context.Context, *GetPaymentStatusRequest) (*GetPaymentStatusResponse, error)
-	// ── Presence ──────────────────────────────────────────
-	// Streaming lokasi dari mobile app
+	// Streaming — tidak support HTTP/1.1, skip annotation
 	StreamMyLocation(grpc.BidiStreamingServer[StreamMyLocationRequest, StreamMyLocationResponse]) error
 	mustEmbedUnimplementedGatewayServiceServer()
 }

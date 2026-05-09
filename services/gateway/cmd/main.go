@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	billingv1 "github.com/edysupardi/parkirpintar/gen/billing/v1"
 	gatewayv1 "github.com/edysupardi/parkirpintar/gen/gateway/v1"
 	paymentv1 "github.com/edysupardi/parkirpintar/gen/payment/v1"
@@ -15,6 +18,7 @@ import (
 	reservationv1 "github.com/edysupardi/parkirpintar/gen/reservation/v1"
 	"github.com/edysupardi/parkirpintar/pkg/auth"
 	"github.com/edysupardi/parkirpintar/pkg/config"
+	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
 	"github.com/edysupardi/parkirpintar/services/gateway/internal/handler"
 	"google.golang.org/grpc"
@@ -22,7 +26,11 @@ import (
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/protobuf/encoding/protojson"
 )
+
+//go:embed swagger.json
+var swaggerJSON []byte
 
 func main() {
 	ctx := context.Background()
@@ -35,41 +43,40 @@ func main() {
 
 	log := logger.New(logger.Config{Service: "gateway", Level: "info"})
 
-	// dial downstream services
-	reservationConn, err := grpc.NewClient(fmt.Sprintf("localhost:%d", cfg.Services.ReservationGRPCPort),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
-	)
+	// database (for auth endpoints)
+	db, err := database.New(ctx, database.Config{
+		Host:         cfg.Database.Host,
+		Port:         cfg.Database.Port,
+		Name:         cfg.Database.Name,
+		User:         cfg.Database.User,
+		Password:     cfg.Database.Password,
+		SSLMode:      cfg.Database.SSLMode,
+		MaxOpenConns: int32(cfg.Database.MaxOpenConns),
+		MaxIdleConns: int32(cfg.Database.MaxIdleConns),
+	})
 	if err != nil {
-		log.Fatal(ctx).Err(err).Msg("failed to connect to reservation service")
+		log.Fatal(ctx).Err(err).Msg("failed to connect to database")
 	}
+	defer db.Close()
+
+	dial := func(addr string) *grpc.ClientConn {
+		conn, err := grpc.NewClient(addr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+		)
+		if err != nil {
+			log.Fatal(ctx).Err(err).Str("addr", addr).Msg("failed to connect")
+		}
+		return conn
+	}
+
+	reservationConn := dial(fmt.Sprintf("%s:%d", cfg.Services.ReservationHost, cfg.Services.ReservationGRPCPort))
 	defer reservationConn.Close()
-
-	billingConn, err := grpc.NewClient(fmt.Sprintf("localhost:%d", cfg.Services.BillingGRPCPort),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
-	)
-	if err != nil {
-		log.Fatal(ctx).Err(err).Msg("failed to connect to billing service")
-	}
+	billingConn := dial(fmt.Sprintf("%s:%d", cfg.Services.BillingHost, cfg.Services.BillingGRPCPort))
 	defer billingConn.Close()
-
-	paymentConn, err := grpc.NewClient(fmt.Sprintf("localhost:%d", cfg.Services.PaymentGRPCPort),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
-	)
-	if err != nil {
-		log.Fatal(ctx).Err(err).Msg("failed to connect to payment service")
-	}
+	paymentConn := dial(fmt.Sprintf("%s:%d", cfg.Services.PaymentHost, cfg.Services.PaymentGRPCPort))
 	defer paymentConn.Close()
-
-	presenceConn, err := grpc.NewClient(fmt.Sprintf("localhost:%d", cfg.Services.PresenceGRPCPort),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
-	)
-	if err != nil {
-		log.Fatal(ctx).Err(err).Msg("failed to connect to presence service")
-	}
+	presenceConn := dial(fmt.Sprintf("%s:%d", cfg.Services.PresenceHost, cfg.Services.PresenceGRPCPort))
 	defer presenceConn.Close()
 
 	h := handler.New(
@@ -80,30 +87,97 @@ func main() {
 	)
 
 	validator := auth.New(cfg.JWT.Secret)
-	srv := grpc.NewServer(grpc.UnaryInterceptor(validator.UnaryInterceptor))
 
-	gatewayv1.RegisterGatewayServiceServer(srv, h)
-	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())
-	reflection.Register(srv)
+	// gRPC server for direct gRPC clients (with auth interceptor)
+	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(validator.UnaryInterceptor))
+	gatewayv1.RegisterGatewayServiceServer(grpcSrv, h)
+	grpc_health_v1.RegisterHealthServer(grpcSrv, health.NewServer())
+	reflection.Register(grpcSrv)
 
-	addr := fmt.Sprintf(":%d", 50050)
-	lis, err := net.Listen("tcp", addr)
+	grpcAddr := ":50050"
+	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		log.Fatal(ctx).Err(err).Msg("failed to listen")
+		log.Fatal(ctx).Err(err).Msg("failed to listen gRPC")
 	}
 
-	log.Info(ctx).Str("addr", addr).Msg("gateway service starting")
+	// ── grpc-gateway HTTP mux ─────────────────────────────────────────────────
+	mux := runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
+			MarshalOptions: protojson.MarshalOptions{
+				UseProtoNames:   true,
+				EmitUnpopulated: false,
+			},
+		}),
+	)
+
+	if err := gatewayv1.RegisterGatewayServiceHandlerServer(ctx, mux, h); err != nil {
+		log.Fatal(ctx).Err(err).Msg("failed to register gateway handler")
+	}
+
+	httpMux := http.NewServeMux()
+	httpMux.Handle("/v1/", mux)
+
+	// auth endpoints (public, no JWT required)
+	authH := handler.NewAuth(db.Pool(), validator, cfg.JWT.ExpiryHours)
+	httpMux.HandleFunc("/v1/auth/register", authH.Register)
+	httpMux.HandleFunc("/v1/auth/login", authH.Login)
+
+	// extra endpoints
+	extraH := handler.NewExtra(db.Pool(), validator, cfg.Midtrans.ServerKey)
+	httpMux.HandleFunc("/v1/reservations/history", extraH.ReservationHistory)
+	httpMux.HandleFunc("/v1/parking/spots", extraH.ListAvailableSpots)
+	httpMux.HandleFunc("/v1/payments/simulate-settle", extraH.SimulateSettle)
+
+	httpMux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+	httpMux.HandleFunc("/swagger.json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(swaggerJSON)
+	})
+	httpMux.HandleFunc("/swagger/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r,
+			"https://petstore.swagger.io/?url="+r.Host+"/swagger.json",
+			http.StatusFound)
+	})
+
+	httpAddr := ":8080"
+	httpSrv := &http.Server{Addr: httpAddr, Handler: corsMiddleware(validator.HTTPMiddleware(httpMux))}
+
+	log.Info(ctx).Str("grpc", grpcAddr).Str("http", httpAddr).Msg("gateway starting")
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		if err := srv.Serve(lis); err != nil {
-			log.Fatal(ctx).Err(err).Msg("grpc server error")
+		if err := grpcSrv.Serve(lis); err != nil {
+			log.Fatal(ctx).Err(err).Msg("gRPC server error")
+		}
+	}()
+	go func() {
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(ctx).Err(err).Msg("HTTP server error")
 		}
 	}()
 
 	<-quit
 	log.Info(ctx).Msg("shutting down")
-	srv.GracefulStop()
+	grpcSrv.GracefulStop()
+	httpSrv.Shutdown(ctx)
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

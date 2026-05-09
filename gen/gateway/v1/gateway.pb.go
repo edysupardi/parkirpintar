@@ -8,6 +8,7 @@ package gatewayv1
 
 import (
 	v1 "github.com/edysupardi/parkirpintar/gen/common/v1"
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -73,10 +74,9 @@ type GetParkingAvailabilityResponse struct {
 	TotalCapacity  int32                  `protobuf:"varint,2,opt,name=total_capacity,json=totalCapacity,proto3" json:"total_capacity,omitempty"`
 	AvailableSpots int32                  `protobuf:"varint,3,opt,name=available_spots,json=availableSpots,proto3" json:"available_spots,omitempty"`
 	IsAvailable    bool                   `protobuf:"varint,4,opt,name=is_available,json=isAvailable,proto3" json:"is_available,omitempty"`
-	// Summary per lantai untuk user-selected mode
-	Floors        []*FloorSummary `protobuf:"bytes,5,rep,name=floors,proto3" json:"floors,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Floors         []*FloorSummary        `protobuf:"bytes,5,rep,name=floors,proto3" json:"floors,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetParkingAvailabilityResponse) Reset() {
@@ -205,12 +205,11 @@ func (x *FloorSummary) GetTotalSpots() int32 {
 }
 
 type CreateReservationRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// driver_id di-inject dari JWT — tidak perlu dikirim client
-	VehicleType    v1.VehicleType    `protobuf:"varint,1,opt,name=vehicle_type,json=vehicleType,proto3,enum=common.v1.VehicleType" json:"vehicle_type,omitempty"`
-	AssignmentMode v1.AssignmentMode `protobuf:"varint,2,opt,name=assignment_mode,json=assignmentMode,proto3,enum=common.v1.AssignmentMode" json:"assignment_mode,omitempty"`
-	SpotId         string            `protobuf:"bytes,3,opt,name=spot_id,json=spotId,proto3" json:"spot_id,omitempty"` // opsional, kalau user-selected
-	IdempotencyKey string            `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	VehicleType    v1.VehicleType         `protobuf:"varint,1,opt,name=vehicle_type,json=vehicleType,proto3,enum=common.v1.VehicleType" json:"vehicle_type,omitempty"`
+	AssignmentMode v1.AssignmentMode      `protobuf:"varint,2,opt,name=assignment_mode,json=assignmentMode,proto3,enum=common.v1.AssignmentMode" json:"assignment_mode,omitempty"`
+	SpotId         string                 `protobuf:"bytes,3,opt,name=spot_id,json=spotId,proto3" json:"spot_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1422,8 +1421,7 @@ func (x *GetPaymentStatusResponse) GetPaidAt() *timestamppb.Timestamp {
 }
 
 type StreamMyLocationRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// driver_id dari JWT — tidak perlu dikirim ulang
+	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	ReservationId string                 `protobuf:"bytes,2,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
 	Coordinate    *v1.Coordinate         `protobuf:"bytes,3,opt,name=coordinate,proto3" json:"coordinate,omitempty"`
@@ -1492,7 +1490,7 @@ func (x *StreamMyLocationRequest) GetRecordedAt() *timestamppb.Timestamp {
 
 type StreamMyLocationResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
-	EventType        string                 `protobuf:"bytes,1,opt,name=event_type,json=eventType,proto3" json:"event_type,omitempty"` // "ack", "check_in_triggered", "approaching"
+	EventType        string                 `protobuf:"bytes,1,opt,name=event_type,json=eventType,proto3" json:"event_type,omitempty"`
 	InGeofence       bool                   `protobuf:"varint,2,opt,name=in_geofence,json=inGeofence,proto3" json:"in_geofence,omitempty"`
 	DistanceToSpot   float32                `protobuf:"fixed32,3,opt,name=distance_to_spot,json=distanceToSpot,proto3" json:"distance_to_spot,omitempty"`
 	CheckInTriggered bool                   `protobuf:"varint,4,opt,name=check_in_triggered,json=checkInTriggered,proto3" json:"check_in_triggered,omitempty"`
@@ -1663,7 +1661,7 @@ var File_gateway_v1_gateway_proto protoreflect.FileDescriptor
 const file_gateway_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"\x18gateway/v1/gateway.proto\x12\n" +
-	"gateway.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16common/v1/common.proto\"Z\n" +
+	"gateway.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16common/v1/common.proto\"Z\n" +
 	"\x1dGetParkingAvailabilityRequest\x129\n" +
 	"\fvehicle_type\x18\x01 \x01(\x0e2\x16.common.v1.VehicleTypeR\vvehicleType\"\x80\x02\n" +
 	"\x1eGetParkingAvailabilityResponse\x129\n" +
@@ -1805,19 +1803,20 @@ const file_gateway_v1_gateway_proto_rawDesc = "" +
 	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12:\n" +
 	"\vcheck_in_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckInAt\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\a \x01(\tR\tsessionId2\xed\a\n" +
-	"\x0eGatewayService\x12o\n" +
-	"\x16GetParkingAvailability\x12).gateway.v1.GetParkingAvailabilityRequest\x1a*.gateway.v1.GetParkingAvailabilityResponse\x12`\n" +
-	"\x11CreateReservation\x12$.gateway.v1.CreateReservationRequest\x1a%.gateway.v1.CreateReservationResponse\x12]\n" +
-	"\x10GetMyReservation\x12#.gateway.v1.GetMyReservationRequest\x1a$.gateway.v1.GetMyReservationResponse\x12`\n" +
-	"\x11CancelReservation\x12$.gateway.v1.CancelReservationRequest\x1a%.gateway.v1.CancelReservationResponse\x12B\n" +
-	"\aCheckIn\x12\x1a.gateway.v1.CheckInRequest\x1a\x1b.gateway.v1.CheckInResponse\x12E\n" +
-	"\bCheckOut\x12\x1b.gateway.v1.CheckOutRequest\x1a\x1c.gateway.v1.CheckOutResponse\x12K\n" +
+	"session_id\x18\a \x01(\tR\tsessionId2\xe6\n" +
 	"\n" +
-	"GetInvoice\x12\x1d.gateway.v1.GetInvoiceRequest\x1a\x1e.gateway.v1.GetInvoiceResponse\x12W\n" +
-	"\x0ePreviewBilling\x12!.gateway.v1.PreviewBillingRequest\x1a\".gateway.v1.PreviewBillingResponse\x12T\n" +
-	"\rCreatePayment\x12 .gateway.v1.CreatePaymentRequest\x1a!.gateway.v1.CreatePaymentResponse\x12]\n" +
-	"\x10GetPaymentStatus\x12#.gateway.v1.GetPaymentStatusRequest\x1a$.gateway.v1.GetPaymentStatusResponse\x12a\n" +
+	"\x0eGatewayService\x12\x91\x01\n" +
+	"\x16GetParkingAvailability\x12).gateway.v1.GetParkingAvailabilityRequest\x1a*.gateway.v1.GetParkingAvailabilityResponse\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/v1/parking/availability\x12}\n" +
+	"\x11CreateReservation\x12$.gateway.v1.CreateReservationRequest\x1a%.gateway.v1.CreateReservationResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/reservations\x12z\n" +
+	"\x10GetMyReservation\x12#.gateway.v1.GetMyReservationRequest\x1a$.gateway.v1.GetMyReservationResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/reservations/me\x12\x8b\x01\n" +
+	"\x11CancelReservation\x12$.gateway.v1.CancelReservationRequest\x1a%.gateway.v1.CancelReservationResponse\")\x82\xd3\xe4\x93\x02#*!/v1/reservations/{reservation_id}\x12y\n" +
+	"\aCheckIn\x12\x1a.gateway.v1.CheckInRequest\x1a\x1b.gateway.v1.CheckInResponse\"5\x82\xd3\xe4\x93\x02/:\x01*\"*/v1/reservations/{reservation_id}/check-in\x12}\n" +
+	"\bCheckOut\x12\x1b.gateway.v1.CheckOutRequest\x1a\x1c.gateway.v1.CheckOutResponse\"6\x82\xd3\xe4\x93\x020:\x01*\"+/v1/reservations/{reservation_id}/check-out\x12n\n" +
+	"\n" +
+	"GetInvoice\x12\x1d.gateway.v1.GetInvoiceRequest\x1a\x1e.gateway.v1.GetInvoiceResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/invoices/{invoice_id}\x12t\n" +
+	"\x0ePreviewBilling\x12!.gateway.v1.PreviewBillingRequest\x1a\".gateway.v1.PreviewBillingResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/billing/preview\x12m\n" +
+	"\rCreatePayment\x12 .gateway.v1.CreatePaymentRequest\x1a!.gateway.v1.CreatePaymentResponse\"\x17\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/payments\x12\x84\x01\n" +
+	"\x10GetPaymentStatus\x12#.gateway.v1.GetPaymentStatusRequest\x1a$.gateway.v1.GetPaymentStatusResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/payments/{transaction_id}\x12a\n" +
 	"\x10StreamMyLocation\x12#.gateway.v1.StreamMyLocationRequest\x1a$.gateway.v1.StreamMyLocationResponse(\x010\x01B=Z;github.com/edysupardi/parkirpintar/gen/gateway/v1;gatewayv1b\x06proto3"
 
 var (

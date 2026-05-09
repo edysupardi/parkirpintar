@@ -1,6 +1,7 @@
 version: v1
 name: buf.build/edysupardi/parkirpintar
-deps: []
+deps:
+  - buf.build/googleapis/googleapis
 breaking:
   use:
     - FILE

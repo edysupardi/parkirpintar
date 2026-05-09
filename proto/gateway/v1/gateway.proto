@@ -4,62 +4,97 @@ package gateway.v1;
 
 option go_package = "github.com/edysupardi/parkirpintar/gen/gateway/v1;gatewayv1";
 
+import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
 import "common/v1/common.proto";
 
-// ─────────────────────────────────────────────────────────────
-// Gateway Service
-//
-// Gateway adalah satu-satunya entry point dari mobile app.
-// Service ini:
-//   1. Validasi JWT token
-//   2. Rate limiting
-//   3. Translate REST ↔ gRPC
-//   4. Aggregate response dari multiple services kalau perlu
-//
-// Catatan: Gateway tidak punya business logic.
-// Semua business logic ada di downstream services.
-// ─────────────────────────────────────────────────────────────
-
 service GatewayService {
 
-  // ── Parking Area ──────────────────────────────────────
-  // Cek ketersediaan spot (sebelum reserve)
+  // GET /v1/parking/availability?vehicle_type=CAR
   rpc GetParkingAvailability(GetParkingAvailabilityRequest)
-      returns (GetParkingAvailabilityResponse);
+      returns (GetParkingAvailabilityResponse) {
+    option (google.api.http) = {
+      get: "/v1/parking/availability"
+    };
+  }
 
-  // ── Reservation ───────────────────────────────────────
+  // POST /v1/reservations
   rpc CreateReservation(CreateReservationRequest)
-      returns (CreateReservationResponse);
+      returns (CreateReservationResponse) {
+    option (google.api.http) = {
+      post: "/v1/reservations"
+      body: "*"
+    };
+  }
 
+  // GET /v1/reservations/me
   rpc GetMyReservation(GetMyReservationRequest)
-      returns (GetMyReservationResponse);
+      returns (GetMyReservationResponse) {
+    option (google.api.http) = {
+      get: "/v1/reservations/me"
+    };
+  }
 
+  // DELETE /v1/reservations/{reservation_id}
   rpc CancelReservation(CancelReservationRequest)
-      returns (CancelReservationResponse);
+      returns (CancelReservationResponse) {
+    option (google.api.http) = {
+      delete: "/v1/reservations/{reservation_id}"
+    };
+  }
 
+  // POST /v1/reservations/{reservation_id}/check-in
   rpc CheckIn(CheckInRequest)
-      returns (CheckInResponse);
+      returns (CheckInResponse) {
+    option (google.api.http) = {
+      post: "/v1/reservations/{reservation_id}/check-in"
+      body: "*"
+    };
+  }
 
+  // POST /v1/reservations/{reservation_id}/check-out
   rpc CheckOut(CheckOutRequest)
-      returns (CheckOutResponse);
+      returns (CheckOutResponse) {
+    option (google.api.http) = {
+      post: "/v1/reservations/{reservation_id}/check-out"
+      body: "*"
+    };
+  }
 
-  // ── Billing ───────────────────────────────────────────
+  // GET /v1/invoices/{invoice_id}
   rpc GetInvoice(GetInvoiceRequest)
-      returns (GetInvoiceResponse);
+      returns (GetInvoiceResponse) {
+    option (google.api.http) = {
+      get: "/v1/invoices/{invoice_id}"
+    };
+  }
 
+  // GET /v1/billing/preview?session_id=xxx
   rpc PreviewBilling(PreviewBillingRequest)
-      returns (PreviewBillingResponse);
+      returns (PreviewBillingResponse) {
+    option (google.api.http) = {
+      get: "/v1/billing/preview"
+    };
+  }
 
-  // ── Payment ───────────────────────────────────────────
+  // POST /v1/payments
   rpc CreatePayment(CreatePaymentRequest)
-      returns (CreatePaymentResponse);
+      returns (CreatePaymentResponse) {
+    option (google.api.http) = {
+      post: "/v1/payments"
+      body: "*"
+    };
+  }
 
+  // GET /v1/payments/{transaction_id}
   rpc GetPaymentStatus(GetPaymentStatusRequest)
-      returns (GetPaymentStatusResponse);
+      returns (GetPaymentStatusResponse) {
+    option (google.api.http) = {
+      get: "/v1/payments/{transaction_id}"
+    };
+  }
 
-  // ── Presence ──────────────────────────────────────────
-  // Streaming lokasi dari mobile app
+  // Streaming — tidak support HTTP/1.1, skip annotation
   rpc StreamMyLocation(stream StreamMyLocationRequest)
       returns (stream StreamMyLocationResponse);
 }
@@ -77,9 +112,7 @@ message GetParkingAvailabilityResponse {
   int32                 total_capacity  = 2;
   int32                 available_spots = 3;
   bool                  is_available    = 4;
-
-  // Summary per lantai untuk user-selected mode
-  repeated FloorSummary floors = 5;
+  repeated FloorSummary floors          = 5;
 }
 
 message FloorSummary {
@@ -89,36 +122,33 @@ message FloorSummary {
 }
 
 // ─────────────────────────────────────────
-// Reservation via Gateway
+// Reservation
 // ─────────────────────────────────────────
 
 message CreateReservationRequest {
-  // driver_id di-inject dari JWT — tidak perlu dikirim client
   common.v1.VehicleType    vehicle_type    = 1;
   common.v1.AssignmentMode assignment_mode = 2;
-  string                   spot_id         = 3;  // opsional, kalau user-selected
+  string                   spot_id         = 3;
   string                   idempotency_key = 4;
 }
 
 message CreateReservationResponse {
-  string                      reservation_id = 1;
-  common.v1.Spot              spot           = 2;
-  common.v1.ReservationStatus status         = 3;
-  google.protobuf.Timestamp   confirmed_at   = 4;
-  google.protobuf.Timestamp   expires_at     = 5;
-  common.v1.Money             booking_fee    = 6;
-  SpotNavigation navigation = 7;
+  string                    reservation_id = 1;
+  common.v1.Spot            spot           = 2;
+  common.v1.ReservationStatus status       = 3;
+  google.protobuf.Timestamp confirmed_at   = 4;
+  google.protobuf.Timestamp expires_at     = 5;
+  common.v1.Money           booking_fee    = 6;
+  SpotNavigation            navigation     = 7;
 }
 
 message SpotNavigation {
-  int32  floor        = 1;
-  int32  spot_number  = 2;
-  string direction    = 3;
+  int32  floor       = 1;
+  int32  spot_number = 2;
+  string direction   = 3;
 }
 
-message GetMyReservationRequest {
-  // driver_id dari JWT
-}
+message GetMyReservationRequest {}
 
 message GetMyReservationResponse {
   bool        has_active_reservation = 1;
@@ -163,7 +193,7 @@ message CheckOutResponse {
 }
 
 // ─────────────────────────────────────────
-// Billing via Gateway
+// Billing
 // ─────────────────────────────────────────
 
 message GetInvoiceRequest {
@@ -194,13 +224,13 @@ message InvoiceSummary {
 }
 
 // ─────────────────────────────────────────
-// Payment via Gateway
+// Payment
 // ─────────────────────────────────────────
 
 message CreatePaymentRequest {
-  string                   invoice_id      = 1;
-  common.v1.PaymentMethod  payment_method  = 2;
-  string                   idempotency_key = 3;
+  string                  invoice_id      = 1;
+  common.v1.PaymentMethod payment_method  = 2;
+  string                  idempotency_key = 3;
 }
 
 message CreatePaymentResponse {
@@ -225,23 +255,22 @@ message GetPaymentStatusResponse {
 }
 
 // ─────────────────────────────────────────
-// Presence via Gateway (streaming)
+// Presence (streaming)
 // ─────────────────────────────────────────
 
 message StreamMyLocationRequest {
-  // driver_id dari JWT — tidak perlu dikirim ulang
-  string               session_id     = 1;
-  string               reservation_id = 2;
-  common.v1.Coordinate coordinate     = 3;
-  google.protobuf.Timestamp recorded_at = 4;
+  string                    session_id     = 1;
+  string                    reservation_id = 2;
+  common.v1.Coordinate      coordinate     = 3;
+  google.protobuf.Timestamp recorded_at    = 4;
 }
 
 message StreamMyLocationResponse {
-  string event_type        = 1;  // "ack", "check_in_triggered", "approaching"
-  bool   in_geofence       = 2;
-  float  distance_to_spot  = 3;
+  string event_type         = 1;
+  bool   in_geofence        = 2;
+  float  distance_to_spot   = 3;
   bool   check_in_triggered = 4;
-  string message           = 5;
+  string message            = 5;
 }
 
 // ─────────────────────────────────────────

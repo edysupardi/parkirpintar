@@ -70,13 +70,17 @@ func (h *GatewayHandler) CreateReservation(ctx context.Context, req *gatewayv1.C
 		return nil, err
 	}
 
+	// Booking fee 5.000 is charged upfront (non-refundable commitment fee).
+	// In production super app, this would debit the linked wallet.
+	// Here we acknowledge it in the response — the fee is implicit in the reservation confirmation.
+
 	return &gatewayv1.CreateReservationResponse{
 		ReservationId: resp.ReservationId,
 		Spot:          resp.Spot,
 		Status:        resp.Status,
 		ConfirmedAt:   resp.ConfirmedAt,
 		ExpiresAt:     resp.ExpiresAt,
-		BookingFee:    resp.BookingFee,
+		BookingFee:    &commonv1.Money{Amount: 5000, Currency: "IDR"},
 		Navigation: &gatewayv1.SpotNavigation{
 			Floor:      resp.Spot.Floor,
 			SpotNumber: resp.Spot.Number,
@@ -177,12 +181,22 @@ func (h *GatewayHandler) CheckOut(ctx context.Context, req *gatewayv1.CheckOutRe
 		return nil, err
 	}
 
+	// fetch full reservation to get check_in_at
+	resDetail, err := h.reservation.GetReservation(ctx, &reservationv1.GetReservationRequest{
+		ReservationId: req.ReservationId,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	// generate invoice via billing service
 	invResp, err := h.billing.GenerateInvoice(ctx, &billingv1.GenerateInvoiceRequest{
 		SessionId:      resResp.SessionId,
 		ReservationId:  req.ReservationId,
 		DriverId:       driverID,
-		IdempotencyKey: req.IdempotencyKey,
+		IdempotencyKey: "inv-" + req.IdempotencyKey,
+		CheckInAt:      resDetail.Reservation.ConfirmedAt,
+		CheckOutAt:     resResp.CheckOutAt,
 	})
 	if err != nil {
 		return nil, err
