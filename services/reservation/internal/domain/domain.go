@@ -10,18 +10,18 @@ type AssignmentMode string
 type ReservationStatus string
 
 const (
-	VehicleTypeCar        VehicleType = "CAR"
-	VehicleTypeMotorcycle VehicleType = "MOTORCYCLE"
+	VehicleTypeCar        VehicleType = "car"
+	VehicleTypeMotorcycle VehicleType = "motorcycle"
 
-	AssignmentModeSystem   AssignmentMode = "SYSTEM"
-	AssignmentModeSelected AssignmentMode = "USER_SELECTED"
+	AssignmentModeSystem   AssignmentMode = "system"
+	AssignmentModeSelected AssignmentMode = "user_selected"
 
-	StatusPending   ReservationStatus = "PENDING"
-	StatusConfirmed ReservationStatus = "CONFIRMED"
-	StatusActive    ReservationStatus = "ACTIVE"
-	StatusCompleted ReservationStatus = "COMPLETED"
-	StatusCancelled ReservationStatus = "CANCELLED"
-	StatusExpired   ReservationStatus = "EXPIRED"
+	StatusPending   ReservationStatus = "pending"
+	StatusConfirmed ReservationStatus = "confirmed"
+	StatusActive    ReservationStatus = "active"
+	StatusCompleted ReservationStatus = "completed"
+	StatusCancelled ReservationStatus = "cancelled"
+	StatusExpired   ReservationStatus = "expired"
 
 	HoldDuration = 1 * time.Hour
 )

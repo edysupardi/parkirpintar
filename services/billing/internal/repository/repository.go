@@ -77,11 +77,12 @@ type scanner interface {
 func scanInvoice(row scanner) (*domain.Invoice, error) {
 	var inv domain.Invoice
 	var status string
+	var gatewayTxID, paymentMethod *string
 	err := row.Scan(
 		&inv.InvoiceID, &inv.SessionID, &inv.ReservationID, &inv.DriverID,
 		&inv.BookingFee, &inv.ParkingFee, &inv.OvernightFee, &inv.TotalAmount,
 		&inv.BilledHours, &inv.IsOvernight, &inv.DurationMins,
-		&status, &inv.GatewayTxID, &inv.PaymentMethod, &inv.IdempotencyKey,
+		&status, &gatewayTxID, &paymentMethod, &inv.IdempotencyKey,
 		&inv.CreatedAt, &inv.PaidAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -91,5 +92,11 @@ func scanInvoice(row scanner) (*domain.Invoice, error) {
 		return nil, fmt.Errorf("scan invoice: %w", err)
 	}
 	inv.Status = domain.InvoiceStatus(status)
+	if gatewayTxID != nil {
+		inv.GatewayTxID = *gatewayTxID
+	}
+	if paymentMethod != nil {
+		inv.PaymentMethod = *paymentMethod
+	}
 	return &inv, nil
 }

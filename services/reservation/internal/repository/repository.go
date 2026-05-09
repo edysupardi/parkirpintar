@@ -205,13 +205,17 @@ type scanner interface {
 func scanReservation(row scanner) (*domain.Reservation, error) {
 	var res domain.Reservation
 	var status, mode, vt string
+	var sessionID *string
 	err := row.Scan(
 		&res.ReservationID, &res.DriverID, &status, &mode, &res.IdempotencyKey,
-		&res.ConfirmedAt, &res.ExpiresAt, &res.CheckInAt, &res.CheckOutAt, &res.CancelledAt, &res.SessionID,
+		&res.ConfirmedAt, &res.ExpiresAt, &res.CheckInAt, &res.CheckOutAt, &res.CancelledAt, &sessionID,
 		&res.Spot.SpotID, &res.Spot.Floor, &res.Spot.SpotNumber, &vt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scan reservation: %w", err)
+	}
+	if sessionID != nil {
+		res.SessionID = *sessionID
 	}
 	res.Status = domain.ReservationStatus(status)
 	res.AssignmentMode = domain.AssignmentMode(mode)
