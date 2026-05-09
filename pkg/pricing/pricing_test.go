@@ -48,7 +48,7 @@ func TestCalculate_NormalSession(t *testing.T) {
 	assert.Equal(t, int64(10_000), result.ParkingFee)
 	assert.Equal(t, int64(5_000),  result.BookingFee)
 	assert.Equal(t, int64(0),      result.OvernightFee)
-	assert.Equal(t, int64(15_000), result.TotalAmount)
+	assert.Equal(t, int64(10_000), result.TotalAmount) // parking only, booking fee charged at reserve
 }
 
 func TestCalculateCancellationFee_Under2Min(t *testing.T) {

@@ -22,7 +22,7 @@ type Result struct {
 	IsOvernight  bool
 }
 
-// Calculate computes the full billing for a parking session.
+// Calculate computes the billing for a parking session (excludes booking fee — charged separately at reservation).
 func Calculate(checkIn, checkOut time.Time) Result {
 	billed := BilledHours(checkIn, checkOut)
 	overnight := IsOvernight(checkIn, checkOut)
@@ -37,7 +37,7 @@ func Calculate(checkIn, checkOut time.Time) Result {
 		BookingFee:   BookingFee,
 		ParkingFee:   parkingFee,
 		OvernightFee: overnightFee,
-		TotalAmount:  BookingFee + parkingFee + overnightFee,
+		TotalAmount:  parkingFee + overnightFee,
 		BilledHours:  billed,
 		IsOvernight:  overnight,
 	}
