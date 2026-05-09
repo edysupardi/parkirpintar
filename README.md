@@ -509,6 +509,34 @@ Path-based trigger: hanya service yang berubah yang di-build ulang.
 | Errors | Error rate | > 1% warning, > 5% critical |
 | Saturation | CPU ECS task, Redis memory | CPU > 80%, Redis > 70% |
 
+### Structured Logging
+
+Semua service menggunakan **zerolog** (JSON structured logging) dengan fitur:
+
+| Feature | Detail |
+|---------|--------|
+| Request ID | Auto-generated UUID per request, propagated via `X-Request-ID` header (HTTP) dan gRPC metadata |
+| HTTP Request Logger | Method, path, status, latency, IP, user_agent, user_id |
+| gRPC Request Logger | Method, status code, latency, request_id |
+| Sensitive Masking | Fields `password`, `token`, `secret` di-mask sebagai `[REDACTED]` |
+| Log Levels | `debug` (dev), `info` (prod), configurable via env |
+| Correlation | Request ID sama di gateway dan downstream service untuk tracing |
+
+**Log format (production):**
+```json
+{"level":"info","service":"gateway","request_id":"a1b2c3d4","method":"POST","path":"/v1/reservations","status":200,"latency":45.2,"ip":"192.168.1.25","user_agent":"Mozilla/5.0","time":"2026-05-09T14:30:00Z","message":"http request"}
+```
+
+**Middleware chain (gateway):**
+```
+Request Logger → Rate Limiter → CORS → Auth → Handler
+```
+
+**gRPC interceptor (internal services):**
+```
+Logger Interceptor → Handler
+```
+
 ### Tools
 
 | Tool | Fungsi |
