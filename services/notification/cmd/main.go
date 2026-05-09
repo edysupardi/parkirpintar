@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	notificationv1 "github.com/edysupardi/parkirpintar/gen/notification/v1"
-	"github.com/edysupardi/parkirpintar/pkg/auth"
 	"github.com/edysupardi/parkirpintar/pkg/config"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/handler"
@@ -36,14 +35,14 @@ func main() {
 
 	_ = cfg // cfg used when real FCM/SES providers are wired
 
-	validator := auth.New(cfg.JWT.Secret)
-	srv := grpc.NewServer(grpc.UnaryInterceptor(validator.UnaryInterceptor))
+	
+	srv := grpc.NewServer()
 
 	notificationv1.RegisterNotificationServiceServer(srv, handler.New(push, email, log))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())
 	reflection.Register(srv)
 
-	addr := fmt.Sprintf(":%d", 50055)
+	addr := fmt.Sprintf(":%d", cfg.Services.NotificationGRPCPort)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(ctx).Err(err).Msg("failed to listen")

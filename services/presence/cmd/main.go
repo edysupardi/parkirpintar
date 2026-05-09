@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	presencev1 "github.com/edysupardi/parkirpintar/gen/presence/v1"
-	"github.com/edysupardi/parkirpintar/pkg/auth"
 	"github.com/edysupardi/parkirpintar/pkg/config"
 	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
@@ -49,14 +48,14 @@ func main() {
 
 	repo := repository.New(db.Pool())
 
-	validator := auth.New(cfg.JWT.Secret)
-	srv := grpc.NewServer(grpc.UnaryInterceptor(validator.UnaryInterceptor))
+	
+	srv := grpc.NewServer()
 
 	presencev1.RegisterPresenceServiceServer(srv, handler.New(repo, log))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())
 	reflection.Register(srv)
 
-	addr := fmt.Sprintf(":%d", 50054)
+	addr := fmt.Sprintf(":%d", cfg.Services.PresenceGRPCPort)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(ctx).Err(err).Msg("failed to listen")

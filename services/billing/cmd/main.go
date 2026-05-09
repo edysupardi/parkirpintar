@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	billingv1 "github.com/edysupardi/parkirpintar/gen/billing/v1"
-	"github.com/edysupardi/parkirpintar/pkg/auth"
 	"github.com/edysupardi/parkirpintar/pkg/config"
 	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/idempotency"
@@ -57,14 +56,14 @@ func main() {
 	idempotencyStore := idempotency.New(rdb)
 	uc := usecase.New(repo, idempotencyStore, log)
 
-	validator := auth.New(cfg.JWT.Secret)
-	srv := grpc.NewServer(grpc.UnaryInterceptor(validator.UnaryInterceptor))
+	
+	srv := grpc.NewServer()
 
 	billingv1.RegisterBillingServiceServer(srv, handler.New(uc))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())
 	reflection.Register(srv)
 
-	addr := fmt.Sprintf(":%d", 50052)
+	addr := fmt.Sprintf(":%d", cfg.Services.BillingGRPCPort)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(ctx).Err(err).Msg("failed to listen")

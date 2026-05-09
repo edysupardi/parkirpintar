@@ -10,7 +10,6 @@ import (
 	"time"
 
 	reservationv1 "github.com/edysupardi/parkirpintar/gen/reservation/v1"
-	"github.com/edysupardi/parkirpintar/pkg/auth"
 	"github.com/edysupardi/parkirpintar/pkg/config"
 	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/idempotency"
@@ -83,17 +82,14 @@ func main() {
 	// expiry background job
 	go runExpiryJob(ctx, uc, log)
 
-	// gRPC server
-	validator := auth.New(cfg.JWT.Secret)
-	srv := grpc.NewServer(
-		grpc.UnaryInterceptor(validator.UnaryInterceptor),
-	)
+	// gRPC server — no auth here, gateway is the auth boundary
+	srv := grpc.NewServer()
 
 	reservationv1.RegisterReservationServiceServer(srv, handler.New(uc))
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())
 	reflection.Register(srv)
 
-	addr := fmt.Sprintf(":%d", 50051)
+	addr := fmt.Sprintf(":%d", cfg.Services.ReservationGRPCPort)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(ctx).Err(err).Msg("failed to listen")
