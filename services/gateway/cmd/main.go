@@ -143,9 +143,10 @@ func main() {
 	})
 
 	httpAddr := ":8080"
+	limiter := handler.NewRateLimiter(100, 1*time.Minute)
 	httpSrv := &http.Server{
 		Addr:              httpAddr,
-		Handler:           corsMiddleware(validator.HTTPMiddleware(httpMux)),
+		Handler:           limiter.Middleware(corsMiddleware(validator.HTTPMiddleware(httpMux))),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
