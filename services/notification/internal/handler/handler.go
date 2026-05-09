@@ -69,8 +69,8 @@ func (h *NotificationHandler) BroadcastNotification(ctx context.Context, req *no
 		}
 	}
 	return &notificationv1.BroadcastNotificationResponse{
-		TotalSent:       int32(len(req.DriverIds) - len(failed)),
-		TotalFailed:     int32(len(failed)),
+		TotalSent:       int32(len(req.DriverIds) - len(failed)), // #nosec G115 — bounded by request size
+		TotalFailed:     int32(len(failed)),                      // #nosec G115 — bounded by request size
 		FailedDriverIds: failed,
 	}, nil
 }

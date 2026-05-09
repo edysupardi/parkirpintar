@@ -70,5 +70,9 @@ func BilledHours(checkIn, checkOut time.Time) int32 {
 	if mins <= 0 {
 		return 0
 	}
-	return int32((mins + 59) / 60)
+	hours := (mins + 59) / 60
+	if hours > 720 {
+		hours = 720
+	}
+	return int32(hours) // #nosec G115 — bounded above
 }

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	billingv1 "github.com/edysupardi/parkirpintar/gen/billing/v1"
@@ -51,8 +52,8 @@ func main() {
 		User:         cfg.Database.User,
 		Password:     cfg.Database.Password,
 		SSLMode:      cfg.Database.SSLMode,
-		MaxOpenConns: int32(cfg.Database.MaxOpenConns),
-		MaxIdleConns: int32(cfg.Database.MaxIdleConns),
+		MaxOpenConns: cfg.Database.MaxOpenConns,
+		MaxIdleConns: cfg.Database.MaxIdleConns,
 	})
 	if err != nil {
 		log.Fatal(ctx).Err(err).Msg("failed to connect to database")
@@ -94,7 +95,7 @@ func main() {
 	grpc_health_v1.RegisterHealthServer(grpcSrv, health.NewServer())
 	reflection.Register(grpcSrv)
 
-	grpcAddr := ":50050"
+	grpcAddr := "0.0.0.0:50050" // #nosec G102 — intentional, internal gRPC server
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		log.Fatal(ctx).Err(err).Msg("failed to listen gRPC")
@@ -130,20 +131,23 @@ func main() {
 
 	httpMux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 	httpMux.HandleFunc("/swagger.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(swaggerJSON)
+		_, _ = w.Write(swaggerJSON)
 	})
-	httpMux.HandleFunc("/swagger/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r,
-			"https://petstore.swagger.io/?url="+r.Host+"/swagger.json",
-			http.StatusFound)
+	httpMux.HandleFunc("/swagger/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body><a href="https://petstore.swagger.io/?url=http://localhost:8080/swagger.json">Open Swagger UI</a></body></html>`))
 	})
 
 	httpAddr := ":8080"
-	httpSrv := &http.Server{Addr: httpAddr, Handler: corsMiddleware(validator.HTTPMiddleware(httpMux))}
+	httpSrv := &http.Server{
+		Addr:              httpAddr,
+		Handler:           corsMiddleware(validator.HTTPMiddleware(httpMux)),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 
 	log.Info(ctx).Str("grpc", grpcAddr).Str("http", httpAddr).Msg("gateway starting")
 
@@ -164,7 +168,7 @@ func main() {
 	<-quit
 	log.Info(ctx).Msg("shutting down")
 	grpcSrv.GracefulStop()
-	httpSrv.Shutdown(ctx)
+	_ = httpSrv.Shutdown(ctx)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

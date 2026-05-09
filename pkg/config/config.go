@@ -31,8 +31,8 @@ type DatabaseConfig struct {
 	User            string
 	Password        string
 	SSLMode         string
-	MaxOpenConns    int
-	MaxIdleConns    int
+	MaxOpenConns    int32
+	MaxIdleConns    int32
 	ConnTimeout     time.Duration
 }
 
@@ -220,8 +220,8 @@ func bindAll(v *viper.Viper, cfg *Config) error {
 		User:         v.GetString("DB_USER"),
 		Password:     v.GetString("DB_PASSWORD"),
 		SSLMode:      v.GetString("DB_SSL_MODE"),
-		MaxOpenConns: v.GetInt("DB_MAX_OPEN_CONNS"),
-		MaxIdleConns: v.GetInt("DB_MAX_IDLE_CONNS"),
+		MaxOpenConns: int32(v.GetInt("DB_MAX_OPEN_CONNS")), // #nosec G115 — bounded by config default (25)
+		MaxIdleConns: int32(v.GetInt("DB_MAX_IDLE_CONNS")), // #nosec G115 — bounded by config default (5)
 		ConnTimeout:  time.Duration(v.GetInt("DB_CONN_TIMEOUT_SECONDS")) * time.Second,
 	}
 

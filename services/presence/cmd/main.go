@@ -38,8 +38,8 @@ func main() {
 		User:         cfg.Database.User,
 		Password:     cfg.Database.Password,
 		SSLMode:      cfg.Database.SSLMode,
-		MaxOpenConns: int32(cfg.Database.MaxOpenConns),
-		MaxIdleConns: int32(cfg.Database.MaxIdleConns),
+		MaxOpenConns: cfg.Database.MaxOpenConns,
+		MaxIdleConns: cfg.Database.MaxIdleConns,
 	})
 	if err != nil {
 		log.Fatal(ctx).Err(err).Msg("failed to connect to database")
