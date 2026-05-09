@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc"
@@ -48,6 +50,19 @@ func (v *Validator) ParseToken(tokenStr string) (*Claims, error) {
 	return claims, nil
 }
 
+func (v *Validator) GenerateToken(userID, vehicleType string, expiryHours int) (string, error) {
+	claims := &Claims{
+		UserID:      userID,
+		VehicleType: vehicleType,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expiryHours) * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(v.secret)
+}
+
 // UnaryInterceptor validates JWT from gRPC metadata and injects user_id into context.
 func (v *Validator) UnaryInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	if isPublicMethod(info.FullMethod) {
@@ -86,4 +101,33 @@ var publicMethods = map[string]bool{
 
 func isPublicMethod(method string) bool {
 	return publicMethods[method]
+}
+
+// HTTPMiddleware validates JWT from HTTP Authorization header and injects user_id into context.
+// Used with grpc-gateway's RegisterHandlerServer (in-process, no gRPC interceptor).
+func (v *Validator) HTTPMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/swagger.json" ||
+			strings.HasPrefix(r.URL.Path, "/swagger/") ||
+			r.URL.Path == "/v1/auth/register" || r.URL.Path == "/v1/auth/login" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, `{"code":16,"message":"missing authorization header"}`, http.StatusUnauthorized)
+			return
+		}
+
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		claims, err := v.ParseToken(tokenStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"code":16,"message":"invalid token: %v"}`, err), http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

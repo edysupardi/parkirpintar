@@ -68,14 +68,19 @@ type JWTConfig struct {
 	ExpiryHours int
 }
 
-// ServicesConfig menyimpan port untuk setiap gRPC service.
+// ServicesConfig menyimpan host dan port untuk setiap gRPC service.
 type ServicesConfig struct {
 	GatewayHTTPPort      int
 	GatewayGRPCPort      int
+	ReservationHost      string
 	ReservationGRPCPort  int
+	BillingHost          string
 	BillingGRPCPort      int
+	PaymentHost          string
 	PaymentGRPCPort      int
+	PresenceHost         string
 	PresenceGRPCPort     int
+	NotificationHost     string
 	NotificationGRPCPort int
 }
 
@@ -175,13 +180,18 @@ func setDefaults(v *viper.Viper) {
 	// JWT
 	v.SetDefault("JWT_EXPIRY_HOURS", 24)
 
-	// Service ports
+	// Service hosts and ports
 	v.SetDefault("GATEWAY_HTTP_PORT", 8080)
 	v.SetDefault("GATEWAY_GRPC_PORT", 9000)
+	v.SetDefault("RESERVATION_HOST", "localhost")
 	v.SetDefault("RESERVATION_GRPC_PORT", 9001)
+	v.SetDefault("BILLING_HOST", "localhost")
 	v.SetDefault("BILLING_GRPC_PORT", 9002)
+	v.SetDefault("PAYMENT_HOST", "localhost")
 	v.SetDefault("PAYMENT_GRPC_PORT", 9003)
+	v.SetDefault("PRESENCE_HOST", "localhost")
 	v.SetDefault("PRESENCE_GRPC_PORT", 9004)
+	v.SetDefault("NOTIFICATION_HOST", "localhost")
 	v.SetDefault("NOTIFICATION_GRPC_PORT", 9005)
 
 	// Midtrans
@@ -233,10 +243,15 @@ func bindAll(v *viper.Viper, cfg *Config) error {
 	cfg.Services = ServicesConfig{
 		GatewayHTTPPort:      v.GetInt("GATEWAY_HTTP_PORT"),
 		GatewayGRPCPort:      v.GetInt("GATEWAY_GRPC_PORT"),
+		ReservationHost:      v.GetString("RESERVATION_HOST"),
 		ReservationGRPCPort:  v.GetInt("RESERVATION_GRPC_PORT"),
+		BillingHost:          v.GetString("BILLING_HOST"),
 		BillingGRPCPort:      v.GetInt("BILLING_GRPC_PORT"),
+		PaymentHost:          v.GetString("PAYMENT_HOST"),
 		PaymentGRPCPort:      v.GetInt("PAYMENT_GRPC_PORT"),
+		PresenceHost:         v.GetString("PRESENCE_HOST"),
 		PresenceGRPCPort:     v.GetInt("PRESENCE_GRPC_PORT"),
+		NotificationHost:     v.GetString("NOTIFICATION_HOST"),
 		NotificationGRPCPort: v.GetInt("NOTIFICATION_GRPC_PORT"),
 	}
 
