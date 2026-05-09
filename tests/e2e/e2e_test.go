@@ -66,12 +66,15 @@ func newPaymentUC(gw *payment.MockGateway) *payment.Usecase {
 	return payment.NewUsecase(testDB.Pool, testRds.Client, gw, "server-key-test", newLog())
 }
 
-// helper: full reservation flow (reserve → check-in → check-out), returns completed reservation
+// helper: full reservation flow (reserve → confirm → check-in → check-out), returns completed reservation
 func doFullReservationFlow(t *testing.T, ctx context.Context, ruc *reservation.Usecase) *reservation.Reservation {
 	t.Helper()
 	driverID := uid()
 
 	res, err := ruc.CreateReservation(ctx, driverID, uid(), reservation.VehicleTypeCar, reservation.AssignmentModeSystem, "")
+	require.NoError(t, err)
+
+	res, err = ruc.ConfirmReservation(ctx, res.ReservationID)
 	require.NoError(t, err)
 
 	res, err = ruc.CheckIn(ctx, res.ReservationID, driverID)
@@ -97,6 +100,10 @@ func TestE2E_01_HappyPath(t *testing.T) {
 
 	res, err := ruc.CreateReservation(ctx, driverID, uid(), reservation.VehicleTypeCar, reservation.AssignmentModeSystem, "")
 	require.NoError(t, err)
+	assert.Equal(t, reservation.StatusPending, res.Status)
+
+	res, err = ruc.ConfirmReservation(ctx, res.ReservationID)
+	require.NoError(t, err)
 	assert.Equal(t, reservation.StatusConfirmed, res.Status)
 
 	res, err = ruc.CheckIn(ctx, res.ReservationID, driverID)
@@ -107,8 +114,9 @@ func TestE2E_01_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, reservation.StatusCompleted, res.Status)
 
-	checkIn := res.CheckOutAt.Add(-1*time.Hour - 1*time.Minute) // simulate 1h1m parking
-	inv, err := buc.GenerateInvoice(ctx, res.SessionID, res.ReservationID, driverID, uid(), checkIn, *res.CheckOutAt)
+	checkIn := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)  // 10:00 — no overnight
+	checkOut := time.Date(2026, 5, 5, 11, 1, 0, 0, time.UTC) // 11:01 — 2h ceil
+	inv, err := buc.GenerateInvoice(ctx, res.SessionID, res.ReservationID, driverID, uid(), checkIn, checkOut)
 	require.NoError(t, err)
 	assert.Equal(t, billing.InvoiceStatusPendingPayment, inv.Status)
 	assert.Equal(t, int32(2), inv.BilledHours)
@@ -229,15 +237,19 @@ func TestE2E_07_ExtendedStay_NoOverstayPenalty(t *testing.T) {
 	res, err := ruc.CreateReservation(ctx, driverID, uid(), reservation.VehicleTypeCar, reservation.AssignmentModeSystem, "")
 	require.NoError(t, err)
 
+	res, err = ruc.ConfirmReservation(ctx, res.ReservationID)
+	require.NoError(t, err)
+
 	res, err = ruc.CheckIn(ctx, res.ReservationID, driverID)
 	require.NoError(t, err)
 
 	res, err = ruc.CheckOut(ctx, res.ReservationID, driverID, uid())
 	require.NoError(t, err)
 
-	// simulate 3 hour stay
-	checkIn := res.CheckOutAt.Add(-3 * time.Hour)
-	inv, err := buc.GenerateInvoice(ctx, res.SessionID, res.ReservationID, driverID, uid(), checkIn, *res.CheckOutAt)
+	// simulate 3 hour stay (fixed times, no overnight)
+	checkIn := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	checkOut := time.Date(2026, 5, 5, 13, 0, 0, 0, time.UTC)
+	inv, err := buc.GenerateInvoice(ctx, res.SessionID, res.ReservationID, driverID, uid(), checkIn, checkOut)
 	require.NoError(t, err)
 
 	assert.Equal(t, int64(3), int64(inv.BilledHours))

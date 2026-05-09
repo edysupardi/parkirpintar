@@ -140,7 +140,7 @@ func (uc *ReservationUsecase) CancelReservation(ctx context.Context, reservation
 	if r.DriverID != driverID {
 		return nil, 0, fmt.Errorf("reservation not owned by driver")
 	}
-	if r.Status != domain.StatusConfirmed {
+	if r.Status != domain.StatusConfirmed && r.Status != domain.StatusPending {
 		return nil, 0, fmt.Errorf("reservation cannot be cancelled in status %s", r.Status)
 	}
 

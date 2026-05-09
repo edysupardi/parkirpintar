@@ -188,7 +188,7 @@ func (r *PostgresRepository) ListExpiredReservations(ctx context.Context, before
 		       s.id, s.floor, s.number, s.vehicle_type
 		FROM reservations r
 		JOIN spots s ON s.id = r.spot_id
-		WHERE r.status = 'confirmed' AND r.expires_at < $1`, before)
+		WHERE r.status IN ('confirmed', 'pending') AND r.expires_at < $1`, before)
 	if err != nil {
 		return nil, err
 	}

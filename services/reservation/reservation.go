@@ -24,6 +24,7 @@ const (
 	VehicleTypeMotorcycle = domain.VehicleTypeMotorcycle
 	AssignmentModeSystem  = domain.AssignmentModeSystem
 	AssignmentModeSelected = domain.AssignmentModeSelected
+	StatusPending         = domain.StatusPending
 	StatusConfirmed       = domain.StatusConfirmed
 	StatusActive          = domain.StatusActive
 	StatusCompleted       = domain.StatusCompleted
