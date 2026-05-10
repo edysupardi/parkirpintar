@@ -36,6 +36,18 @@ locals {
 
 data "aws_caller_identity" "current" {}
 
+data "aws_secretsmanager_secret" "jwt" {
+  name = "${var.project_name}/dev/jwt-secret"
+}
+
+data "aws_secretsmanager_secret" "db_password" {
+  name = "${var.project_name}/dev/db-password"
+}
+
+data "aws_secretsmanager_secret" "midtrans" {
+  name = "${var.project_name}/dev/midtrans-server-key"
+}
+
 module "networking" {
   source             = "../../modules/networking"
   project_name       = var.project_name
@@ -110,12 +122,16 @@ module "ecs" {
       grpc          = false
       environment = [
         { name = "ENV", value = "dev" },
+        { name = "DB_HOST", value = module.rds.cluster_endpoint },
+        { name = "DB_USER", value = "parkirpintar" },
+        { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
         { name = "GRPC_RESERVATION_ADDR", value = "${var.project_name}-dev-reservation:9090" },
         { name = "GRPC_BILLING_ADDR", value = "${var.project_name}-dev-billing:9090" },
         { name = "GRPC_PRESENCE_ADDR", value = "${var.project_name}-dev-presence:9090" },
       ]
       secrets = [
-        { name = "JWT_SECRET", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/dev/jwt-secret" }
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn },
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn }
       ]
     }
     reservation = {
@@ -128,11 +144,14 @@ module "ecs" {
       environment = [
         { name = "ENV", value = "dev" },
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
+        { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
         { name = "MQ_URL", value = local.mq_endpoint },
+        { name = "RESERVATION_GRPC_PORT", value = "9090" },
       ]
       secrets = [
-        { name = "DB_PASSWORD", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/dev/db-password" }
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn },
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn }
       ]
     }
     billing = {
@@ -145,10 +164,13 @@ module "ecs" {
       environment = [
         { name = "ENV", value = "dev" },
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
+        { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
+        { name = "BILLING_GRPC_PORT", value = "9090" },
       ]
       secrets = [
-        { name = "DB_PASSWORD", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/dev/db-password" }
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn },
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn }
       ]
     }
     payment = {
@@ -161,12 +183,16 @@ module "ecs" {
       environment = [
         { name = "ENV", value = "dev" },
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
+        { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
         { name = "PAYMENT_PROVIDER", value = "midtrans" },
+        { name = "MIDTRANS_CLIENT_KEY", value = "SB-Mid-client-CteqXD_Bh8T3RYeg" },
+        { name = "PAYMENT_GRPC_PORT", value = "9090" },
       ]
       secrets = [
-        { name = "DB_PASSWORD", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/dev/db-password" },
-        { name = "MIDTRANS_SERVER_KEY", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/dev/midtrans-server-key" }
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn },
+        { name = "MIDTRANS_SERVER_KEY", valueFrom = data.aws_secretsmanager_secret.midtrans.arn },
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn }
       ]
     }
     presence = {
@@ -179,8 +205,12 @@ module "ecs" {
       environment = [
         { name = "ENV", value = "dev" },
         { name = "MQ_URL", value = local.mq_endpoint },
+        { name = "PRESENCE_GRPC_PORT", value = "9090" },
       ]
-      secrets = []
+      secrets = [
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn },
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn }
+      ]
     }
     notification = {
       image         = "${local.ecr_base}/${var.project_name}-notification:latest"
@@ -193,8 +223,12 @@ module "ecs" {
         { name = "ENV", value = "dev" },
         { name = "MQ_URL", value = local.mq_endpoint },
         { name = "NOTIFICATION_PROVIDER", value = "stub" },
+        { name = "NOTIFICATION_GRPC_PORT", value = "9090" },
       ]
-      secrets = []
+      secrets = [
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn },
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn }
+      ]
     }
   }
 }
