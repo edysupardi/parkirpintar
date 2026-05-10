@@ -105,6 +105,69 @@ func (h *ExtraHandler) ConfirmBookingPayment(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// GET /v1/reservations/pending-payment?reservation_id=xxx
+func (h *ExtraHandler) GetPendingPayment(w http.ResponseWriter, r *http.Request) {
+	_, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "missing user id")
+		return
+	}
+
+	reservationID := r.URL.Query().Get("reservation_id")
+	if reservationID == "" {
+		writeError(w, http.StatusBadRequest, "reservation_id is required")
+		return
+	}
+
+	var status string
+	var expiresAt time.Time
+	var spotFloor, spotNumber int32
+	err := h.db.QueryRow(context.Background(),
+		`SELECT r.status, r.expires_at, s.floor, s.number
+		 FROM reservations r JOIN spots s ON s.id = r.spot_id
+		 WHERE r.id = $1`, reservationID,
+	).Scan(&status, &expiresAt, &spotFloor, &spotNumber)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "reservation not found")
+		return
+	}
+
+	if status != "pending" {
+		writeError(w, http.StatusBadRequest, "reservation is not pending")
+		return
+	}
+
+	if time.Now().After(expiresAt) {
+		writeError(w, http.StatusGone, "payment timeout expired")
+		return
+	}
+
+	var txID, qrString string
+	_ = h.db.QueryRow(context.Background(),
+		`SELECT t.id, t.qr_string FROM transactions t
+		 JOIN invoices i ON i.id = t.invoice_id
+		 WHERE i.reservation_id = $1 AND i.type = 'booking_fee'
+		 ORDER BY t.created_at DESC LIMIT 1`, reservationID,
+	).Scan(&txID, &qrString)
+
+	remaining := int(time.Until(expiresAt).Seconds())
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"reservation_id":    reservationID,
+		"transaction_id":    txID,
+		"qr_string":        qrString,
+		"expires_at":        expiresAt,
+		"remaining_seconds": remaining,
+		"spot": map[string]any{
+			"floor":  spotFloor,
+			"number": spotNumber,
+		},
+	})
+}
+
 // GET /v1/reservations/history
 func (h *ExtraHandler) ReservationHistory(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())

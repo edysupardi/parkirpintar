@@ -130,6 +130,7 @@ func main() {
 	// extra endpoints
 	httpMux.HandleFunc("/v1/reservations/history", extraH.ReservationHistory)
 	httpMux.HandleFunc("/v1/reservations/confirm-payment", extraH.ConfirmBookingPayment)
+	httpMux.HandleFunc("/v1/reservations/pending-payment", extraH.GetPendingPayment)
 	httpMux.HandleFunc("/v1/parking/spots", extraH.ListAvailableSpots)
 	httpMux.HandleFunc("/v1/payments/simulate-settle", extraH.SimulateSettle)
 
