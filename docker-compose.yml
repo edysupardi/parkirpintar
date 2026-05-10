@@ -129,9 +129,10 @@ services:
     environment:
       <<: *common-env
       PAYMENT_GRPC_PORT: "9003"
-      MIDTRANS_SERVER_KEY: SB-Mid-server-local
-      MIDTRANS_CLIENT_KEY: SB-Mid-client-local
+      MIDTRANS_SERVER_KEY: SB-Mid-server-U6zJTc84IGZAHay1Ov22B6kr
+      MIDTRANS_CLIENT_KEY: SB-Mid-client-CteqXD_Bh8T3RYeg
       MIDTRANS_ENV: sandbox
+      PAYMENT_PROVIDER: midtrans
     ports:
       - "9003:9003"
     <<: *depends-infra

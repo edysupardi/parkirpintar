@@ -28,7 +28,7 @@ func NewMidtrans(serverKey string, isProduction bool) *MidtransGateway {
 
 func (g *MidtransGateway) CreateQRIS(ctx context.Context, orderID string, amount int64, customer domain.CustomerInfo) (qrString, paymentURL string, expiredAt time.Time, err error) {
 	req := &coreapi.ChargeReq{
-		PaymentType: coreapi.PaymentTypeQris,
+		PaymentType: coreapi.PaymentTypeGopay,
 		TransactionDetails: midtrans.TransactionDetails{
 			OrderID:  orderID,
 			GrossAmt: amount,
@@ -40,13 +40,33 @@ func (g *MidtransGateway) CreateQRIS(ctx context.Context, orderID string, amount
 		},
 	}
 
-	resp, err := g.client.ChargeTransaction(req)
-	if err != nil {
-		return "", "", time.Time{}, fmt.Errorf("midtrans charge QRIS: %w", err)
+	resp, midErr := g.client.ChargeTransaction(req)
+	if midErr != nil && midErr.Message != "" {
+		return "", "", time.Time{}, fmt.Errorf("midtrans charge QRIS: %s", midErr.Message)
+	}
+	if resp == nil {
+		return "", "", time.Time{}, fmt.Errorf("midtrans charge QRIS: empty response")
 	}
 
 	expiredAt = time.Now().Add(15 * time.Minute)
-	return resp.QRString, resp.Actions[0].URL, expiredAt, nil
+
+	// GoPay returns QR in actions
+	for _, action := range resp.Actions {
+		if action.Name == "generate-qr-code" {
+			paymentURL = action.URL
+		}
+		if action.Name == "deeplink-redirect" && qrString == "" {
+			qrString = action.URL
+		}
+	}
+	if resp.QRString != "" {
+		qrString = resp.QRString
+	}
+	if paymentURL == "" && len(resp.Actions) > 0 {
+		paymentURL = resp.Actions[0].URL
+	}
+
+	return qrString, paymentURL, expiredAt, nil
 }
 
 func (g *MidtransGateway) CreateVA(ctx context.Context, orderID, bank string, amount int64, customer domain.CustomerInfo) (vaNumber string, expiredAt time.Time, err error) {

@@ -5,6 +5,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/notification ./services/notification/cmd
 
-FROM scratch
+FROM alpine:3.20
+RUN apk --no-cache add ca-certificates
 COPY --from=builder /bin/notification /notification
 ENTRYPOINT ["/notification"]
