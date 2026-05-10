@@ -12,16 +12,18 @@ import (
 	"github.com/edysupardi/parkirpintar/pkg/auth"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type ExtraHandler struct {
 	db        *pgxpool.Pool
+	rdb       *redis.Client
 	validator *auth.Validator
 	serverKey string
 }
 
-func NewExtra(db *pgxpool.Pool, validator *auth.Validator, serverKey string) *ExtraHandler {
-	return &ExtraHandler{db: db, validator: validator, serverKey: serverKey}
+func NewExtra(db *pgxpool.Pool, rdb *redis.Client, validator *auth.Validator, serverKey string) *ExtraHandler {
+	return &ExtraHandler{db: db, rdb: rdb, validator: validator, serverKey: serverKey}
 }
 
 // CreateBookingFeeInvoice creates a booking_fee invoice (pending payment).
@@ -85,6 +87,16 @@ func (h *ExtraHandler) ConfirmBookingPayment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// extend Redis lock to 1 hour
+	var spotID string
+	_ = h.db.QueryRow(context.Background(),
+		`SELECT spot_id FROM reservations WHERE id = $1`, req.ReservationID,
+	).Scan(&spotID)
+	if spotID != "" {
+		lockKey := fmt.Sprintf("spot:%s:lock", spotID)
+		h.rdb.Expire(context.Background(), lockKey, 1*time.Hour)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"reservation_id": req.ReservationID,
 		"status":         "confirmed",
@@ -102,7 +114,7 @@ func (h *ExtraHandler) ReservationHistory(w http.ResponseWriter, r *http.Request
 	}
 
 	rows, err := h.db.Query(context.Background(), `
-		SELECT r.id, r.status, r.confirmed_at, r.check_in_at, r.check_out_at, r.cancelled_at,
+		SELECT r.id, r.status, r.confirmed_at, r.expires_at, r.check_in_at, r.check_out_at, r.cancelled_at,
 		       s.floor, s.number, s.vehicle_type
 		FROM reservations r
 		JOIN spots s ON s.id = r.spot_id
@@ -116,20 +128,30 @@ func (h *ExtraHandler) ReservationHistory(w http.ResponseWriter, r *http.Request
 	}
 	defer rows.Close()
 
+	now := time.Now()
 	var history []map[string]any
 	for rows.Next() {
 		var id, status, vt string
-		var confirmedAt time.Time
+		var confirmedAt, expiresAt time.Time
 		var checkInAt, checkOutAt, cancelledAt *time.Time
 		var floor, number int32
 
-		if err := rows.Scan(&id, &status, &confirmedAt, &checkInAt, &checkOutAt, &cancelledAt, &floor, &number, &vt); err != nil {
+		if err := rows.Scan(&id, &status, &confirmedAt, &expiresAt, &checkInAt, &checkOutAt, &cancelledAt, &floor, &number, &vt); err != nil {
 			continue
 		}
+
+		// auto-mark expired pending reservations
+		if status == "pending" && now.After(expiresAt) {
+			status = "expired"
+			_, _ = h.db.Exec(context.Background(),
+				`UPDATE reservations SET status = 'expired' WHERE id = $1 AND status = 'pending'`, id)
+		}
+
 		entry := map[string]any{
 			"reservation_id": id,
 			"status":         status,
 			"confirmed_at":   confirmedAt,
+			"expires_at":     expiresAt,
 			"spot": map[string]any{
 				"floor":        floor,
 				"number":       number,

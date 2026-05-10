@@ -22,6 +22,7 @@ import (
 	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
 	"github.com/edysupardi/parkirpintar/services/gateway/internal/handler"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health"
@@ -82,7 +83,7 @@ func main() {
 
 	validator := auth.New(cfg.JWT.Secret)
 
-	extraH := handler.NewExtra(db.Pool(), validator, cfg.Midtrans.ServerKey)
+	extraH := handler.NewExtra(db.Pool(), redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr}), validator, cfg.Midtrans.ServerKey)
 
 	h := handler.New(
 		reservationv1.NewReservationServiceClient(reservationConn),
