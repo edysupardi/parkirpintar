@@ -27,3 +27,11 @@ variable "mq_password" {
   type      = string
   sensitive = true
 }
+
+variable "ecs_cluster_id" {
+  type = string
+}
+
+variable "ecs_execution_role_arn" {
+  type = string
+}
