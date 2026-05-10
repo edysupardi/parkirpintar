@@ -36,7 +36,11 @@ config/firebase-credentials.json
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
-terraform/.terraform.lock.hcl
+# terraform/.terraform.lock.hcl
 
 # Internal Docs
 docs/*
+# Terraform plan artifacts
+terraform/**/tfplan
+terraform/**/plan-output.txt
+terraform/**/.terraform/
