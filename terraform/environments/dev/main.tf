@@ -31,6 +31,7 @@ provider "aws" {
 locals {
   services = ["gateway", "reservation", "billing", "payment", "presence", "notification"]
   ecr_base = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+  mq_endpoint = "amqp://${var.project_name}:${var.mq_password}@rabbitmq.${var.project_name}-${var.environment}-mq.local:5672/"
 }
 
 data "aws_caller_identity" "current" {}
@@ -76,13 +77,15 @@ module "elasticache" {
 }
 
 module "mq" {
-  source               = "../../modules/mq"
-  project_name         = var.project_name
-  environment          = var.environment
-  vpc_id               = module.networking.vpc_id
-  private_subnet_ids   = module.networking.private_subnet_ids
-  mq_security_group_id = module.networking.mq_security_group_id
-  mq_password          = var.mq_password
+  source                 = "../../modules/mq"
+  project_name           = var.project_name
+  environment            = var.environment
+  vpc_id                 = module.networking.vpc_id
+  private_subnet_ids     = module.networking.private_subnet_ids
+  mq_security_group_id   = module.networking.mq_security_group_id
+  mq_password            = var.mq_password
+  ecs_cluster_id         = module.ecs.cluster_id
+  ecs_execution_role_arn = module.ecs.execution_role_arn
 }
 
 module "ecs" {
@@ -126,7 +129,7 @@ module "ecs" {
         { name = "ENV", value = "dev" },
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
-        { name = "MQ_URL", value = module.mq.amqp_endpoint },
+        { name = "MQ_URL", value = local.mq_endpoint },
       ]
       secrets = [
         { name = "DB_PASSWORD", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/dev/db-password" }
@@ -175,7 +178,7 @@ module "ecs" {
       grpc          = true
       environment = [
         { name = "ENV", value = "dev" },
-        { name = "MQ_URL", value = module.mq.amqp_endpoint },
+        { name = "MQ_URL", value = local.mq_endpoint },
       ]
       secrets = []
     }
@@ -188,7 +191,7 @@ module "ecs" {
       grpc          = true
       environment = [
         { name = "ENV", value = "dev" },
-        { name = "MQ_URL", value = module.mq.amqp_endpoint },
+        { name = "MQ_URL", value = local.mq_endpoint },
         { name = "NOTIFICATION_PROVIDER", value = "stub" },
       ]
       secrets = []
