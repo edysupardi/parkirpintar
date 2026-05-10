@@ -81,6 +81,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           title  = "ECS CPU Utilization"
+          region = "ap-southeast-1"
           period = 60
           metrics = [for svc in var.service_names : [
             "AWS/ECS", "CPUUtilization",
@@ -93,6 +94,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           title  = "ALB Request Count & Errors"
+          region = "ap-southeast-1"
           period = 60
           metrics = [
             ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", var.alb_arn_suffix],
@@ -104,6 +106,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           title  = "RDS CPU"
+          region = "ap-southeast-1"
           period = 60
           metrics = [
             ["AWS/RDS", "CPUUtilization", "DBClusterIdentifier", var.rds_cluster_id]
