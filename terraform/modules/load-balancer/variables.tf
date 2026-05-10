@@ -23,7 +23,8 @@ variable "alb_security_group_id" {
 }
 
 variable "certificate_arn" {
-  type = string
+  type    = string
+  default = ""
 }
 
 variable "grpc_services" {

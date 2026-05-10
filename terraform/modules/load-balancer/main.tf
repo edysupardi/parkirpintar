@@ -1,5 +1,6 @@
 locals {
   name        = "${var.project_name}-${var.environment}"
+  tg_prefix   = "edysup-pp-${var.environment}"
   common_tags = {
     Project     = var.project_name
     Environment = var.environment
@@ -24,16 +25,30 @@ resource "aws_lb_listener" "http" {
   protocol          = "HTTP"
 
   default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
+    type = var.certificate_arn != "" ? "redirect" : "fixed-response"
+
+    dynamic "redirect" {
+      for_each = var.certificate_arn != "" ? [1] : []
+      content {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+
+    dynamic "fixed_response" {
+      for_each = var.certificate_arn == "" ? [1] : []
+      content {
+        content_type = "text/plain"
+        message_body = "Not Found"
+        status_code  = "404"
+      }
     }
   }
 }
 
 resource "aws_lb_listener" "https" {
+  count             = var.certificate_arn != "" ? 1 : 0
   load_balancer_arn = aws_lb.alb.arn
   port              = 443
   protocol          = "HTTPS"
@@ -52,7 +67,7 @@ resource "aws_lb_listener" "https" {
 
 # ALB target group for gateway service (REST/HTTP)
 resource "aws_lb_target_group" "gateway" {
-  name        = "${local.name}-gateway-tg"
+  name        = "${local.tg_prefix}-gateway-tg"
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
@@ -72,7 +87,7 @@ resource "aws_lb_target_group" "gateway" {
 
 # Route all traffic to gateway
 resource "aws_lb_listener_rule" "gateway" {
-  listener_arn = aws_lb_listener.https.arn
+  listener_arn = var.certificate_arn != "" ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
   priority     = 100
 
   action {
@@ -101,7 +116,7 @@ resource "aws_lb" "nlb" {
 resource "aws_lb_target_group" "grpc" {
   for_each = toset(var.grpc_services)
 
-  name        = "${local.name}-${each.key}-tg"
+  name        = "${local.tg_prefix}-${each.key}-tg"
   port        = 9090
   protocol    = "TCP"
   vpc_id      = var.vpc_id

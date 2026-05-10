@@ -11,7 +11,11 @@ output "alb_arn_suffix" {
 }
 
 output "alb_https_listener_arn" {
-  value = aws_lb_listener.https.arn
+  value = var.certificate_arn != "" ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
+}
+
+output "alb_http_listener_arn" {
+  value = aws_lb_listener.http.arn
 }
 
 output "nlb_arn" {
