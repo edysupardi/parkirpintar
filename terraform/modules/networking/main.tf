@@ -127,6 +127,13 @@ resource "aws_security_group" "ecs" {
     protocol  = "tcp"
     self      = true
   }
+  # Allow NLB traffic (NLB preserves source IP from VPC)
+  ingress {
+    from_port   = 9090
+    to_port     = 9095
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
   egress {
     from_port   = 0
     to_port     = 0
@@ -166,20 +173,26 @@ resource "aws_security_group" "redis" {
 
 resource "aws_security_group" "mq" {
   name        = "${local.name}-mq-sg"
-  description = "Amazon MQ: allow AMQP and console from ECS only"
+  description = "RabbitMQ: allow AMQP and console from ECS only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    from_port       = 5671
-    to_port         = 5671
+    from_port       = 5672
+    to_port         = 5672
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs.id]
   }
   ingress {
-    from_port       = 15671
-    to_port         = 15671
+    from_port       = 15672
+    to_port         = 15672
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs.id]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
   tags = merge(local.common_tags, { Name = "${local.name}-mq-sg" })
 }
