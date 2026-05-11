@@ -39,11 +39,16 @@ func TestIntegration_ReservationToBilling(t *testing.T) {
 
 	driverID := uid()
 
-	// Step 1: Create reservation
+	// Step 1: Create reservation (returns pending)
 	res, err := reservationUC.CreateReservation(ctx, driverID, uid(), reservation.VehicleTypeCar, reservation.AssignmentModeSystem, "")
 	require.NoError(t, err)
-	assert.Equal(t, reservation.StatusConfirmed, res.Status)
+	assert.Equal(t, reservation.StatusPending, res.Status)
 	assert.NotEmpty(t, res.Spot.SpotID)
+
+	// Step 1b: Confirm reservation (simulates payment confirmed)
+	res, err = reservationUC.ConfirmReservation(ctx, res.ReservationID)
+	require.NoError(t, err)
+	assert.Equal(t, reservation.StatusConfirmed, res.Status)
 
 	// Step 2: Check-in
 	res, err = reservationUC.CheckIn(ctx, res.ReservationID, driverID)
