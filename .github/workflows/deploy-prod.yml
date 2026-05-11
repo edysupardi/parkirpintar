@@ -1,8 +1,13 @@
 name: Deploy to Production
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - 'services/**'
+      - 'pkg/**'
+      - 'gen/**'
 
 env:
   AWS_REGION:   ap-southeast-1
