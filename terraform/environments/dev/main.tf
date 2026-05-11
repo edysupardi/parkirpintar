@@ -125,9 +125,15 @@ module "ecs" {
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
         { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
-        { name = "GRPC_RESERVATION_ADDR", value = "${var.project_name}-dev-reservation:9090" },
-        { name = "GRPC_BILLING_ADDR", value = "${var.project_name}-dev-billing:9090" },
-        { name = "GRPC_PRESENCE_ADDR", value = "${var.project_name}-dev-presence:9090" },
+        { name = "REDIS_TLS", value = "true" },
+        { name = "RESERVATION_HOST", value = "edysup-parkirpintar-dev-nlb-c3b727dbddc83273.elb.ap-southeast-1.amazonaws.com" },
+        { name = "RESERVATION_GRPC_PORT", value = "9091" },
+        { name = "BILLING_HOST", value = "edysup-parkirpintar-dev-nlb-c3b727dbddc83273.elb.ap-southeast-1.amazonaws.com" },
+        { name = "BILLING_GRPC_PORT", value = "9092" },
+        { name = "PAYMENT_HOST", value = "edysup-parkirpintar-dev-nlb-c3b727dbddc83273.elb.ap-southeast-1.amazonaws.com" },
+        { name = "PAYMENT_GRPC_PORT", value = "9093" },
+        { name = "PRESENCE_HOST", value = "edysup-parkirpintar-dev-nlb-c3b727dbddc83273.elb.ap-southeast-1.amazonaws.com" },
+        { name = "PRESENCE_GRPC_PORT", value = "9094" },
       ]
       secrets = [
         { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn },
@@ -146,6 +152,7 @@ module "ecs" {
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
         { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
+        { name = "REDIS_TLS", value = "true" },
         { name = "MQ_URL", value = local.mq_endpoint },
         { name = "RESERVATION_GRPC_PORT", value = "9090" },
       ]
@@ -166,6 +173,7 @@ module "ecs" {
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
         { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
+        { name = "REDIS_TLS", value = "true" },
         { name = "BILLING_GRPC_PORT", value = "9090" },
       ]
       secrets = [
@@ -185,6 +193,7 @@ module "ecs" {
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
         { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
+        { name = "REDIS_TLS", value = "true" },
         { name = "PAYMENT_PROVIDER", value = "midtrans" },
         { name = "MIDTRANS_CLIENT_KEY", value = "SB-Mid-client-CteqXD_Bh8T3RYeg" },
         { name = "PAYMENT_GRPC_PORT", value = "9090" },
