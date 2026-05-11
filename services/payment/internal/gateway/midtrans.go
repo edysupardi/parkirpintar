@@ -96,9 +96,9 @@ func (g *MidtransGateway) CreateVA(ctx context.Context, orderID, bank string, am
 		},
 	}
 
-	resp, err := g.client.ChargeTransaction(req)
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("midtrans charge VA: %w", err)
+	resp, midErr := g.client.ChargeTransaction(req)
+	if midErr != nil && midErr.Message != "" {
+		return "", time.Time{}, fmt.Errorf("midtrans charge VA: %s", midErr.Message)
 	}
 
 	vaNumber = ""

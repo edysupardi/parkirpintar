@@ -386,14 +386,6 @@ func (h *GatewayHandler) StreamMyLocation(stream gatewayv1.GatewayService_Stream
 	}
 }
 
-func buildDirection(floor, number int32) string {
-	return "Lantai " + itoa(floor) + ", Spot " + itoa(number)
-}
-
-func itoa(n int32) string {
-	return string(rune('0' + n%10))
-}
-
 // ensure timestamppb is used
 var _ = timestamppb.Now
 var _ = commonv1.VehicleType_VEHICLE_TYPE_CAR
