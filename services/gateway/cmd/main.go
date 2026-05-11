@@ -83,7 +83,7 @@ func main() {
 
 	validator := auth.New(cfg.JWT.Secret)
 
-	extraH := handler.NewExtra(db.Pool(), redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr}), validator, cfg.Midtrans.ServerKey)
+	extraH := handler.NewExtra(db.Pool(), redis.NewClient(cfg.Redis.RedisOptions()), validator, cfg.Midtrans.ServerKey)
 
 	h := handler.New(
 		reservationv1.NewReservationServiceClient(reservationConn),

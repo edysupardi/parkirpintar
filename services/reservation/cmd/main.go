@@ -66,7 +66,7 @@ func main() {
 	if err != nil {
 		log.Fatal(ctx).Err(err).Msg("failed to connect to redis")
 	}
-	rdb := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
+	rdb := redis.NewClient(cfg.Redis.RedisOptions())
 	defer rdb.Close()
 
 	// dependencies

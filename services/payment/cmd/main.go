@@ -51,7 +51,7 @@ func main() {
 	}
 	defer db.Close()
 
-	rdb := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr})
+	rdb := redis.NewClient(cfg.Redis.RedisOptions())
 	defer rdb.Close()
 
 	repo := repository.New(db.Pool())

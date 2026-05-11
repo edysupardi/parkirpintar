@@ -1,10 +1,12 @@
 package config
 
 import (
+	"crypto/tls"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 )
 
@@ -55,6 +57,20 @@ type RedisConfig struct {
 	Addr     string
 	Password string
 	DB       int
+	TLS      bool
+}
+
+// RedisOptions returns go-redis client options with TLS if configured.
+func (r RedisConfig) RedisOptions() *redis.Options {
+	opts := &redis.Options{
+		Addr:     r.Addr,
+		Password: r.Password,
+		DB:       r.DB,
+	}
+	if r.TLS {
+		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+	return opts
 }
 
 // RabbitMQConfig menyimpan konfigurasi koneksi Amazon MQ (RabbitMQ).
@@ -229,6 +245,7 @@ func bindAll(v *viper.Viper, cfg *Config) error {
 		Addr:     v.GetString("REDIS_ADDR"),
 		Password: v.GetString("REDIS_PASSWORD"),
 		DB:       v.GetInt("REDIS_DB"),
+		TLS:      v.GetBool("REDIS_TLS"),
 	}
 
 	cfg.RabbitMQ = RabbitMQConfig{
