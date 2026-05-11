@@ -12,12 +12,13 @@ import (
 func main() {
 	ctx := context.Background()
 	connStr := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		getenv("DB_USER", "postgres"),
 		getenv("DB_PASSWORD", "secret"),
 		getenv("DB_HOST", "localhost"),
 		getenv("DB_PORT", "5432"),
 		getenv("DB_NAME", "parkirpintar"),
+		getenv("DB_SSL_MODE", "disable"),
 	)
 
 	conn, err := pgx.Connect(ctx, connStr)
