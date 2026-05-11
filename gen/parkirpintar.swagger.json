@@ -1,0 +1,819 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "common/v1/common.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "BillingService"
+    },
+    {
+      "name": "GatewayService"
+    },
+    {
+      "name": "NotificationService"
+    },
+    {
+      "name": "PaymentService"
+    },
+    {
+      "name": "PresenceService"
+    },
+    {
+      "name": "ReservationService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/billing/preview": {
+      "get": {
+        "summary": "GET /v1/billing/preview?session_id=xxx",
+        "operationId": "GatewayService_PreviewBilling",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gatewayV1PreviewBillingResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    },
+    "/v1/invoices/{invoiceId}": {
+      "get": {
+        "summary": "GET /v1/invoices/{invoice_id}",
+        "operationId": "GatewayService_GetInvoice",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gatewayV1GetInvoiceResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    },
+    "/v1/parking/availability": {
+      "get": {
+        "summary": "GET /v1/parking/availability?vehicle_type=CAR",
+        "operationId": "GatewayService_GetParkingAvailability",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetParkingAvailabilityResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "vehicleType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "VEHICLE_TYPE_UNSPECIFIED",
+              "VEHICLE_TYPE_CAR",
+              "VEHICLE_TYPE_MOTORCYCLE"
+            ],
+            "default": "VEHICLE_TYPE_UNSPECIFIED"
+          }
+        ],
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    },
+    "/v1/payments": {
+      "post": {
+        "summary": "POST /v1/payments",
+        "operationId": "GatewayService_CreatePayment",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1CreatePaymentResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreatePaymentRequest"
+            }
+          }
+        ],
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    },
+    "/v1/payments/{transactionId}": {
+      "get": {
+        "summary": "GET /v1/payments/{transaction_id}",
+        "operationId": "GatewayService_GetPaymentStatus",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetPaymentStatusResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    },
+    "/v1/reservations": {
+      "post": {
+        "summary": "POST /v1/reservations",
+        "operationId": "GatewayService_CreateReservation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gatewayV1CreateReservationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/gatewayV1CreateReservationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    },
+    "/v1/reservations/me": {
+      "get": {
+        "summary": "GET /v1/reservations/me",
+        "operationId": "GatewayService_GetMyReservation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetMyReservationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    },
+    "/v1/reservations/{reservationId}": {
+      "delete": {
+        "summary": "DELETE /v1/reservations/{reservation_id}",
+        "operationId": "GatewayService_CancelReservation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gatewayV1CancelReservationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    },
+    "/v1/reservations/{reservationId}/check-in": {
+      "post": {
+        "summary": "POST /v1/reservations/{reservation_id}/check-in",
+        "operationId": "GatewayService_CheckIn",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gatewayV1CheckInResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GatewayServiceCheckInBody"
+            }
+          }
+        ],
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    },
+    "/v1/reservations/{reservationId}/check-out": {
+      "post": {
+        "summary": "POST /v1/reservations/{reservation_id}/check-out",
+        "operationId": "GatewayService_CheckOut",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gatewayV1CheckOutResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GatewayServiceCheckOutBody"
+            }
+          }
+        ],
+        "tags": [
+          "GatewayService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "GatewayServiceCheckInBody": {
+      "type": "object",
+      "properties": {
+        "coordinate": {
+          "$ref": "#/definitions/v1Coordinate"
+        },
+        "actualSpotId": {
+          "type": "string"
+        }
+      }
+    },
+    "GatewayServiceCheckOutBody": {
+      "type": "object",
+      "properties": {
+        "idempotencyKey": {
+          "type": "string"
+        }
+      }
+    },
+    "gatewayV1CancelReservationResponse": {
+      "type": "object",
+      "properties": {
+        "reservationId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/v1ReservationStatus"
+        },
+        "cancellationFee": {
+          "$ref": "#/definitions/v1Money"
+        },
+        "feeReason": {
+          "type": "string"
+        }
+      }
+    },
+    "gatewayV1CheckInResponse": {
+      "type": "object",
+      "properties": {
+        "reservationId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/v1ReservationStatus"
+        },
+        "checkInAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "gatewayV1CheckOutResponse": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "invoiceId": {
+          "type": "string"
+        },
+        "checkOutAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "durationMinutes": {
+          "type": "string",
+          "format": "int64"
+        },
+        "invoiceSummary": {
+          "$ref": "#/definitions/v1InvoiceSummary"
+        }
+      }
+    },
+    "gatewayV1CreateReservationRequest": {
+      "type": "object",
+      "properties": {
+        "vehicleType": {
+          "$ref": "#/definitions/v1VehicleType"
+        },
+        "assignmentMode": {
+          "$ref": "#/definitions/v1AssignmentMode"
+        },
+        "spotId": {
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "type": "string"
+        }
+      }
+    },
+    "gatewayV1CreateReservationResponse": {
+      "type": "object",
+      "properties": {
+        "reservationId": {
+          "type": "string"
+        },
+        "spot": {
+          "$ref": "#/definitions/v1Spot"
+        },
+        "status": {
+          "$ref": "#/definitions/v1ReservationStatus"
+        },
+        "confirmedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bookingFee": {
+          "$ref": "#/definitions/v1Money"
+        },
+        "navigation": {
+          "$ref": "#/definitions/v1SpotNavigation"
+        }
+      }
+    },
+    "gatewayV1GetInvoiceResponse": {
+      "type": "object",
+      "properties": {
+        "invoice": {
+          "$ref": "#/definitions/v1InvoiceSummary"
+        }
+      }
+    },
+    "gatewayV1PreviewBillingResponse": {
+      "type": "object",
+      "properties": {
+        "estimated": {
+          "$ref": "#/definitions/v1InvoiceSummary"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "gatewayV1Reservation": {
+      "type": "object",
+      "properties": {
+        "reservationId": {
+          "type": "string"
+        },
+        "spot": {
+          "$ref": "#/definitions/v1Spot"
+        },
+        "status": {
+          "$ref": "#/definitions/v1ReservationStatus"
+        },
+        "confirmedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "checkInAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sessionId": {
+          "type": "string"
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1AssignmentMode": {
+      "type": "string",
+      "enum": [
+        "ASSIGNMENT_MODE_UNSPECIFIED",
+        "ASSIGNMENT_MODE_SYSTEM",
+        "ASSIGNMENT_MODE_USER_SELECTED"
+      ],
+      "default": "ASSIGNMENT_MODE_UNSPECIFIED",
+      "title": "- ASSIGNMENT_MODE_SYSTEM: system pilihkan spot\n - ASSIGNMENT_MODE_USER_SELECTED: user pilih sendiri"
+    },
+    "v1Coordinate": {
+      "type": "object",
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "format": "double"
+        },
+        "longitude": {
+          "type": "number",
+          "format": "double"
+        },
+        "accuracyMeters": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "title": "Koordinat GPS"
+    },
+    "v1CreatePaymentRequest": {
+      "type": "object",
+      "properties": {
+        "invoiceId": {
+          "type": "string"
+        },
+        "paymentMethod": {
+          "$ref": "#/definitions/v1PaymentMethod"
+        },
+        "idempotencyKey": {
+          "type": "string"
+        }
+      }
+    },
+    "v1CreatePaymentResponse": {
+      "type": "object",
+      "properties": {
+        "transactionId": {
+          "type": "string"
+        },
+        "paymentMethod": {
+          "$ref": "#/definitions/v1PaymentMethod"
+        },
+        "paymentUrl": {
+          "type": "string"
+        },
+        "qrString": {
+          "type": "string"
+        },
+        "vaNumber": {
+          "type": "string"
+        },
+        "vaBank": {
+          "type": "string"
+        },
+        "expiredAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "v1FloorSummary": {
+      "type": "object",
+      "properties": {
+        "floor": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "availableSpots": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalSpots": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "v1GetMyReservationResponse": {
+      "type": "object",
+      "properties": {
+        "hasActiveReservation": {
+          "type": "boolean"
+        },
+        "reservation": {
+          "$ref": "#/definitions/gatewayV1Reservation"
+        }
+      }
+    },
+    "v1GetParkingAvailabilityResponse": {
+      "type": "object",
+      "properties": {
+        "vehicleType": {
+          "$ref": "#/definitions/v1VehicleType"
+        },
+        "totalCapacity": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "availableSpots": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "isAvailable": {
+          "type": "boolean"
+        },
+        "floors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1FloorSummary"
+          }
+        }
+      }
+    },
+    "v1GetPaymentStatusResponse": {
+      "type": "object",
+      "properties": {
+        "transactionId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "amount": {
+          "$ref": "#/definitions/v1Money"
+        },
+        "paidAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "v1InvoiceSummary": {
+      "type": "object",
+      "properties": {
+        "invoiceId": {
+          "type": "string"
+        },
+        "bookingFee": {
+          "$ref": "#/definitions/v1Money"
+        },
+        "parkingFee": {
+          "$ref": "#/definitions/v1Money"
+        },
+        "overnightFee": {
+          "$ref": "#/definitions/v1Money"
+        },
+        "totalAmount": {
+          "$ref": "#/definitions/v1Money"
+        },
+        "status": {
+          "type": "string"
+        },
+        "billedHours": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "v1Money": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "string",
+          "format": "int64",
+          "title": "dalam IDR"
+        },
+        "currency": {
+          "type": "string",
+          "title": "selalu \"IDR\""
+        }
+      },
+      "title": "Money — selalu dalam IDR, unit: rupiah (integer, no decimal)"
+    },
+    "v1PaymentMethod": {
+      "type": "string",
+      "enum": [
+        "PAYMENT_METHOD_UNSPECIFIED",
+        "PAYMENT_METHOD_QRIS",
+        "PAYMENT_METHOD_GOPAY",
+        "PAYMENT_METHOD_OVO",
+        "PAYMENT_METHOD_DANA",
+        "PAYMENT_METHOD_VA_BCA",
+        "PAYMENT_METHOD_VA_BNI",
+        "PAYMENT_METHOD_VA_BRI",
+        "PAYMENT_METHOD_VA_MANDIRI"
+      ],
+      "default": "PAYMENT_METHOD_UNSPECIFIED"
+    },
+    "v1ReservationStatus": {
+      "type": "string",
+      "enum": [
+        "RESERVATION_STATUS_UNSPECIFIED",
+        "RESERVATION_STATUS_PENDING",
+        "RESERVATION_STATUS_CONFIRMED",
+        "RESERVATION_STATUS_ACTIVE",
+        "RESERVATION_STATUS_COMPLETED",
+        "RESERVATION_STATUS_CANCELLED",
+        "RESERVATION_STATUS_EXPIRED"
+      ],
+      "default": "RESERVATION_STATUS_UNSPECIFIED",
+      "title": "- RESERVATION_STATUS_ACTIVE: sudah check-in\n - RESERVATION_STATUS_COMPLETED: sudah check-out\n - RESERVATION_STATUS_EXPIRED: no-show \u003e 1 jam"
+    },
+    "v1Spot": {
+      "type": "object",
+      "properties": {
+        "spotId": {
+          "type": "string"
+        },
+        "floor": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "number": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "vehicleType": {
+          "$ref": "#/definitions/v1VehicleType"
+        }
+      },
+      "title": "Spot info — dipakai di reservation dan presence"
+    },
+    "v1SpotNavigation": {
+      "type": "object",
+      "properties": {
+        "floor": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "spotNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "direction": {
+          "type": "string"
+        }
+      }
+    },
+    "v1VehicleType": {
+      "type": "string",
+      "enum": [
+        "VEHICLE_TYPE_UNSPECIFIED",
+        "VEHICLE_TYPE_CAR",
+        "VEHICLE_TYPE_MOTORCYCLE"
+      ],
+      "default": "VEHICLE_TYPE_UNSPECIFIED"
+    }
+  }
+}

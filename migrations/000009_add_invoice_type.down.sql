@@ -1,0 +1,4 @@
+DROP INDEX IF EXISTS idx_invoices_type;
+ALTER TABLE invoices DROP COLUMN IF EXISTS type;
+DROP TYPE IF EXISTS invoice_type;
+ALTER TABLE invoices ALTER COLUMN session_id SET NOT NULL;

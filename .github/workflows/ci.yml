@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      pkg:          ${{ steps.changes.outputs.pkg }}
+      gateway:      ${{ steps.changes.outputs.gateway }}
+      reservation:  ${{ steps.changes.outputs.reservation }}
+      billing:      ${{ steps.changes.outputs.billing }}
+      payment:      ${{ steps.changes.outputs.payment }}
+      presence:     ${{ steps.changes.outputs.presence }}
+      notification: ${{ steps.changes.outputs.notification }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            pkg:
+              - 'pkg/**'
+              - 'gen/**'
+            gateway:
+              - 'services/gateway/**'
+              - 'pkg/**'
+              - 'gen/**'
+            reservation:
+              - 'services/reservation/**'
+              - 'pkg/**'
+              - 'gen/**'
+            billing:
+              - 'services/billing/**'
+              - 'pkg/**'
+              - 'gen/**'
+            payment:
+              - 'services/payment/**'
+              - 'pkg/**'
+              - 'gen/**'
+            presence:
+              - 'services/presence/**'
+              - 'pkg/**'
+              - 'gen/**'
+            notification:
+              - 'services/notification/**'
+              - 'pkg/**'
+              - 'gen/**'
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+  test-pkg:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.pkg == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+      - name: Unit tests
+        run: go test ./pkg/... -v -race -coverprofile=coverage.out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
+  test-integration:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.pkg == 'true' || needs.detect-changes.outputs.reservation == 'true' || needs.detect-changes.outputs.billing == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+      - name: Integration tests
+        run: go test -tags integration ./tests/integration/... -v -timeout 120s
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.reservation == 'true' || needs.detect-changes.outputs.billing == 'true' || needs.detect-changes.outputs.payment == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+      - name: E2E tests
+        run: go test -tags e2e ./tests/e2e/... -v -timeout 180s
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, lint]
+    strategy:
+      matrix:
+        service: [gateway, reservation, billing, payment, presence, notification]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check if service changed
+        id: should-build
+        run: |
+          changed="${{ needs.detect-changes.outputs[matrix.service] }}"
+          echo "changed=$changed" >> $GITHUB_OUTPUT
+      - uses: actions/setup-go@v5
+        if: steps.should-build.outputs.changed == 'true'
+        with:
+          go-version: "1.22"
+          cache: true
+      - name: Build binary
+        if: steps.should-build.outputs.changed == 'true'
+        run: go build ./services/${{ matrix.service }}/cmd/...
+      - name: Build Docker image
+        if: steps.should-build.outputs.changed == 'true'
+        run: docker build -f services/${{ matrix.service }}/Dockerfile -t ${{ matrix.service }}:ci .

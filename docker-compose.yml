@@ -1,0 +1,196 @@
+version: '3.9'
+
+x-common-env: &common-env
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: parkirpintar
+  DB_USER: postgres
+  DB_PASSWORD: secret
+  REDIS_ADDR: redis:6379
+  REDIS_PASSWORD: ""
+  RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  JWT_SECRET: local-dev-secret-minimum-32-characters
+  NOTIFICATION_PROVIDER: stub
+  PAYMENT_PROVIDER: mock
+  PARKING_LAT: "-6.2088"
+  PARKING_LNG: "106.8456"
+  GEOFENCE_RADIUS_METERS: "50.0"
+
+x-depends-infra: &depends-infra
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+
+services:
+  # ── Infrastructure ────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: parkirpintar
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── DB setup ──────────────────────────────────────────────────────────────
+
+  migrate:
+    image: migrate/migrate:v4.18.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command: ["-path", "/migrations", "-database", "postgres://postgres:secret@postgres:5432/parkirpintar?sslmode=disable", "up"]
+    restart: on-failure
+
+  seed:
+    build:
+      context: .
+      dockerfile: scripts/seed/Dockerfile
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: parkirpintar
+      DB_USER: postgres
+      DB_PASSWORD: secret
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: on-failure
+
+  # ── Application services ──────────────────────────────────────────────────
+
+  reservation:
+    build:
+      context: .
+      dockerfile: services/reservation/Dockerfile
+    environment:
+      <<: *common-env
+      RESERVATION_GRPC_PORT: "9001"
+    ports:
+      - "9001:9001"
+    <<: *depends-infra
+    restart: unless-stopped
+
+  billing:
+    build:
+      context: .
+      dockerfile: services/billing/Dockerfile
+    environment:
+      <<: *common-env
+      BILLING_GRPC_PORT: "9002"
+    ports:
+      - "9002:9002"
+    <<: *depends-infra
+    restart: unless-stopped
+
+  payment:
+    build:
+      context: .
+      dockerfile: services/payment/Dockerfile
+    environment:
+      <<: *common-env
+      PAYMENT_GRPC_PORT: "9003"
+      MIDTRANS_SERVER_KEY: SB-Mid-server-U6zJTc84IGZAHay1Ov22B6kr
+      MIDTRANS_CLIENT_KEY: SB-Mid-client-CteqXD_Bh8T3RYeg
+      MIDTRANS_ENV: sandbox
+      PAYMENT_PROVIDER: midtrans
+    ports:
+      - "9003:9003"
+    <<: *depends-infra
+    restart: unless-stopped
+
+  presence:
+    build:
+      context: .
+      dockerfile: services/presence/Dockerfile
+    environment:
+      <<: *common-env
+      PRESENCE_GRPC_PORT: "9004"
+    ports:
+      - "9004:9004"
+    <<: *depends-infra
+    restart: unless-stopped
+
+  notification:
+    build:
+      context: .
+      dockerfile: services/notification/Dockerfile
+    environment:
+      <<: *common-env
+      NOTIFICATION_GRPC_PORT: "9005"
+    ports:
+      - "9005:9005"
+    <<: *depends-infra
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      <<: *common-env
+      GATEWAY_HTTP_PORT: "8080"
+      GATEWAY_GRPC_PORT: "9000"
+      RESERVATION_HOST: reservation
+      RESERVATION_GRPC_PORT: "9001"
+      BILLING_HOST: billing
+      BILLING_GRPC_PORT: "9002"
+      PAYMENT_HOST: payment
+      PAYMENT_GRPC_PORT: "9003"
+      PRESENCE_HOST: presence
+      PRESENCE_GRPC_PORT: "9004"
+    ports:
+      - "8080:8080"
+      - "9000:9000"
+    depends_on:
+      reservation:
+        condition: service_started
+      billing:
+        condition: service_started
+      payment:
+        condition: service_started
+      presence:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

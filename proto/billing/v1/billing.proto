@@ -1,0 +1,156 @@
+syntax = "proto3";
+
+package billing.v1;
+
+option go_package = "github.com/edysupardi/parkirpintar/gen/billing/v1;billingv1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+// ─────────────────────────────────────────
+// Service Definition
+// ─────────────────────────────────────────
+
+service BillingService {
+  // Generate invoice setelah checkout
+  // Dipanggil oleh Reservation Service setelah CheckOut
+  // Idempotent via idempotency_key
+  rpc GenerateInvoice(GenerateInvoiceRequest)
+      returns (GenerateInvoiceResponse);
+
+  // Ambil detail invoice
+  rpc GetInvoice(GetInvoiceRequest)
+      returns (GetInvoiceResponse);
+
+  // Ambil invoice berdasarkan session
+  rpc GetInvoiceBySession(GetInvoiceBySessionRequest)
+      returns (GetInvoiceBySessionResponse);
+
+  // Preview billing sebelum checkout (untuk tampilkan estimasi ke driver)
+  rpc PreviewBilling(PreviewBillingRequest)
+      returns (PreviewBillingResponse);
+
+  // Kalkulasi cancellation fee
+  // Dipanggil Reservation Service saat driver cancel
+  rpc CalculateCancellationFee(CalculateCancellationFeeRequest)
+      returns (CalculateCancellationFeeResponse);
+
+  // Mark invoice sebagai paid (dipanggil Payment Service setelah webhook settled)
+  rpc MarkInvoicePaid(MarkInvoicePaidRequest)
+      returns (MarkInvoicePaidResponse);
+}
+
+// ─────────────────────────────────────────
+// GenerateInvoice
+// ─────────────────────────────────────────
+
+message GenerateInvoiceRequest {
+  string                    session_id      = 1;
+  string                    reservation_id  = 2;
+  string                    driver_id       = 3;
+  google.protobuf.Timestamp check_in_at     = 4;
+  google.protobuf.Timestamp check_out_at    = 5;
+  string                    idempotency_key = 6;
+}
+
+message GenerateInvoiceResponse {
+  string                    invoice_id    = 1;
+  Invoice                   invoice       = 2;
+  google.protobuf.Timestamp generated_at  = 3;
+}
+
+// ─────────────────────────────────────────
+// GetInvoice
+// ─────────────────────────────────────────
+
+message GetInvoiceRequest {
+  string invoice_id = 1;
+}
+
+message GetInvoiceBySessionRequest {
+  string session_id = 1;
+}
+
+message GetInvoiceResponse {
+  Invoice invoice = 1;
+}
+
+message GetInvoiceBySessionResponse {
+  Invoice invoice = 1;
+}
+
+// ─────────────────────────────────────────
+// PreviewBilling
+// ─────────────────────────────────────────
+
+message PreviewBillingRequest {
+  string                    session_id  = 1;
+  google.protobuf.Timestamp check_in_at = 2;
+  // check_out_at = sekarang (dihitung di server)
+}
+
+message PreviewBillingResponse {
+  BillingBreakdown breakdown       = 1;
+  common.v1.Money  estimated_total = 2;
+  string           note            = 3;  // e.g. "Estimasi, final amount saat checkout"
+}
+
+// ─────────────────────────────────────────
+// CalculateCancellationFee
+// ─────────────────────────────────────────
+
+message CalculateCancellationFeeRequest {
+  string                    reservation_id = 1;
+  google.protobuf.Timestamp confirmed_at   = 2;
+  google.protobuf.Timestamp cancelled_at   = 3;
+  bool                      is_no_show     = 4;  // true kalau system yang cancel (expired)
+}
+
+message CalculateCancellationFeeResponse {
+  common.v1.Money fee    = 1;  // 0, 5.000, atau 10.000 IDR
+  string          reason = 2;  // penjelasan rule yang berlaku
+  // e.g. "Cancelled within 2 minutes — no fee"
+  // e.g. "Cancelled after 2 minutes before check-in — 5.000 IDR"
+  // e.g. "No-show after 1 hour — 10.000 IDR"
+}
+
+// ─────────────────────────────────────────
+// MarkInvoicePaid
+// ─────────────────────────────────────────
+
+message MarkInvoicePaidRequest {
+  string                    invoice_id     = 1;
+  string                    gateway_tx_id  = 2;  // Midtrans transaction ID
+  common.v1.PaymentMethod   payment_method = 3;
+  google.protobuf.Timestamp paid_at        = 4;
+}
+
+message MarkInvoicePaidResponse {
+  string                   invoice_id = 1;
+  common.v1.InvoiceStatus  status     = 2;  // PAID
+}
+
+// ─────────────────────────────────────────
+// Shared Messages
+// ─────────────────────────────────────────
+
+message Invoice {
+  string                   invoice_id      = 1;
+  string                   session_id      = 2;
+  string                   reservation_id  = 3;
+  string                   driver_id       = 4;
+  BillingBreakdown         breakdown       = 5;
+  common.v1.Money          total_amount    = 6;
+  common.v1.InvoiceStatus  status          = 7;
+  google.protobuf.Timestamp created_at     = 8;
+  google.protobuf.Timestamp paid_at        = 9;
+}
+
+message BillingBreakdown {
+  common.v1.Money booking_fee     = 1;  // selalu 5.000 IDR
+  common.v1.Money parking_fee     = 2;  // hourly rate
+  common.v1.Money overnight_fee   = 3;  // 0 atau 20.000 IDR
+  int32           billed_hours    = 4;  // jumlah jam yang ditagih (ceil)
+  int64           actual_duration_minutes = 5;
+  bool            is_overnight    = 6;
+}

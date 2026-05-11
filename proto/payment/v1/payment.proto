@@ -1,0 +1,136 @@
+syntax = "proto3";
+
+package payment.v1;
+
+option go_package = "github.com/edysupardi/parkirpintar/gen/payment/v1;paymentv1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+// ─────────────────────────────────────────
+// Service Definition
+// ─────────────────────────────────────────
+
+service PaymentService {
+  // Buat transaksi pembayaran untuk invoice
+  // Dipanggil driver saat mau bayar invoice
+  rpc CreateTransaction(CreateTransactionRequest)
+      returns (CreateTransactionResponse);
+
+  // Cek status pembayaran
+  rpc GetTransactionStatus(GetTransactionStatusRequest)
+      returns (GetTransactionStatusResponse);
+
+  // Handle webhook dari Midtrans
+  // Dipanggil oleh Gateway Service saat Midtrans kirim webhook
+  // Internal use — tidak diekspos ke mobile app
+  rpc HandleWebhook(HandleWebhookRequest)
+      returns (HandleWebhookResponse);
+
+  // List payment history untuk satu invoice
+  rpc ListPaymentsByInvoice(ListPaymentsByInvoiceRequest)
+      returns (ListPaymentsByInvoiceResponse);
+}
+
+// ─────────────────────────────────────────
+// CreateTransaction
+// ─────────────────────────────────────────
+
+message CreateTransactionRequest {
+  string                   invoice_id      = 1;
+  string                   driver_id       = 2;
+  common.v1.Money          amount          = 3;
+  common.v1.PaymentMethod  payment_method  = 4;
+  CustomerInfo             customer_info   = 5;
+  string                   idempotency_key = 6;
+}
+
+message CustomerInfo {
+  string name  = 1;
+  string email = 2;
+  string phone = 3;
+}
+
+message CreateTransactionResponse {
+  string                   transaction_id  = 1;  // internal ID
+  string                   gateway_tx_id   = 2;  // Midtrans order ID
+  TransactionStatus        status          = 3;  // PENDING
+  common.v1.PaymentMethod  payment_method  = 4;
+
+  // Diisi sesuai payment method yang dipilih
+  string payment_url  = 5;  // untuk QRIS, GoPay, OVO, Dana (redirect/deeplink)
+  string qr_string    = 6;  // raw QRIS string (untuk generate QR code di client)
+  string va_number    = 7;  // untuk Virtual Account
+  string va_bank      = 8;  // nama bank VA (BCA, BNI, dll)
+
+  google.protobuf.Timestamp expired_at = 9;   // kapan payment link/VA expired
+}
+
+// ─────────────────────────────────────────
+// GetTransactionStatus
+// ─────────────────────────────────────────
+
+message GetTransactionStatusRequest {
+  string transaction_id = 1;
+}
+
+message GetTransactionStatusResponse {
+  string            transaction_id  = 1;
+  string            invoice_id      = 2;
+  TransactionStatus status          = 3;
+  common.v1.Money   amount          = 4;
+  google.protobuf.Timestamp paid_at = 5;  // diisi kalau SETTLED
+}
+
+// ─────────────────────────────────────────
+// HandleWebhook
+// ─────────────────────────────────────────
+
+// Dipanggil Gateway saat terima POST dari Midtrans
+message HandleWebhookRequest {
+  bytes  payload   = 1;  // raw JSON body dari Midtrans
+  string signature = 2;  // nilai dari header Midtrans-Signature (HMAC-SHA512)
+}
+
+message HandleWebhookResponse {
+  bool   processed      = 1;  // true kalau berhasil diproses
+  bool   is_duplicate   = 2;  // true kalau webhook ini sudah pernah diproses (idempotent)
+  string transaction_id = 3;
+  TransactionStatus new_status = 4;
+}
+
+// ─────────────────────────────────────────
+// ListPaymentsByInvoice
+// ─────────────────────────────────────────
+
+message ListPaymentsByInvoiceRequest {
+  string invoice_id = 1;
+}
+
+message ListPaymentsByInvoiceResponse {
+  repeated Transaction transactions = 1;
+}
+
+// ─────────────────────────────────────────
+// Shared Messages & Enums
+// ─────────────────────────────────────────
+
+enum TransactionStatus {
+  TRANSACTION_STATUS_UNSPECIFIED = 0;
+  TRANSACTION_STATUS_PENDING     = 1;
+  TRANSACTION_STATUS_SETTLED     = 2;
+  TRANSACTION_STATUS_FAILED      = 3;
+  TRANSACTION_STATUS_EXPIRED     = 4;
+  TRANSACTION_STATUS_REFUNDED    = 5;
+}
+
+message Transaction {
+  string                   transaction_id  = 1;
+  string                   invoice_id      = 2;
+  string                   gateway_tx_id   = 3;
+  common.v1.PaymentMethod  payment_method  = 4;
+  TransactionStatus        status          = 5;
+  common.v1.Money          amount          = 6;
+  google.protobuf.Timestamp created_at     = 7;
+  google.protobuf.Timestamp paid_at        = 8;
+}

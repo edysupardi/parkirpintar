@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS spots;
+DROP TYPE IF EXISTS spot_status;
+DROP TYPE IF EXISTS vehicle_type;

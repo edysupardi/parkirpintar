@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package presence.v1;
+
+option go_package = "github.com/edysupardi/parkirpintar/gen/presence/v1;presencev1";
+
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+// ─────────────────────────────────────────
+// Service Definition
+// ─────────────────────────────────────────
+
+service PresenceService {
+  // Bidirectional streaming untuk location tracking
+  //
+  // Flow:
+  //   Client kirim LocationUpdate setiap ≤ 30 detik
+  //   Server balas PresenceAck setiap kali terima update
+  //   Server kirim CheckInTriggered kalau driver masuk geofence
+  //   Stream ditutup saat driver checkout atau session selesai
+  rpc StreamLocation(stream StreamLocationRequest)
+      returns (stream StreamLocationResponse);
+
+  // Ambil lokasi terakhir driver (untuk monitoring/admin)
+  rpc GetLastLocation(GetLastLocationRequest)
+      returns (GetLastLocationResponse);
+
+  // Cek apakah driver sedang dalam geofence parkir
+  rpc CheckGeofence(CheckGeofenceRequest)
+      returns (CheckGeofenceResponse);
+}
+
+// ─────────────────────────────────────────
+// StreamLocation — bidirectional streaming
+// ─────────────────────────────────────────
+
+// Dikirim client setiap ≤ 30 detik
+message StreamLocationRequest {
+  string                   driver_id      = 1;
+  string                   session_id     = 2;  // kosong kalau belum check-in
+  string                   reservation_id = 3;  // untuk associate sebelum check-in
+  common.v1.Coordinate     coordinate     = 4;
+  google.protobuf.Timestamp recorded_at   = 5;
+}
+
+// Dikirim server sebagai response streaming
+message StreamLocationResponse {
+  PresenceEventType         type       = 1;
+  string                    driver_id  = 2;
+  google.protobuf.Timestamp event_at   = 3;
+
+  // Diisi sesuai event type
+  LocationAck     location_ack      = 4;  // untuk ACK
+  CheckInTrigger  check_in_trigger  = 5;  // untuk CHECK_IN_TRIGGERED
+}
+
+enum PresenceEventType {
+  PRESENCE_EVENT_TYPE_UNSPECIFIED       = 0;
+  PRESENCE_EVENT_TYPE_ACK               = 1;  // lokasi diterima, tidak ada event khusus
+  PRESENCE_EVENT_TYPE_CHECK_IN_TRIGGERED = 2; // driver masuk geofence → auto check-in
+  PRESENCE_EVENT_TYPE_APPROACHING       = 3;  // driver dalam radius 200m (notifikasi awal)
+}
+
+// Acknowledgment biasa — lokasi diterima
+message LocationAck {
+  bool  in_geofence        = 1;   // apakah driver saat ini dalam geofence
+  float distance_to_spot   = 2;   // jarak ke spot dalam meter
+}
+
+// Dipicu saat driver masuk geofence (radius 50m dari spot)
+message CheckInTrigger {
+  string             reservation_id = 1;
+  string             spot_id        = 2;
+  common.v1.Coordinate spot_coordinate = 3;
+}
+
+// ─────────────────────────────────────────
+// GetLastLocation
+// ─────────────────────────────────────────
+
+message GetLastLocationRequest {
+  string driver_id = 1;
+}
+
+message GetLastLocationResponse {
+  string                   driver_id   = 1;
+  common.v1.Coordinate     coordinate  = 2;
+  google.protobuf.Timestamp recorded_at = 3;
+  bool                     has_location = 4;  // false kalau belum ada data
+}
+
+// ─────────────────────────────────────────
+// CheckGeofence
+// ─────────────────────────────────────────
+
+message CheckGeofenceRequest {
+  string               driver_id  = 1;
+  common.v1.Coordinate coordinate = 2;
+  string               spot_id    = 3;
+}
+
+message CheckGeofenceResponse {
+  bool  in_geofence      = 1;
+  float distance_meters  = 2;
+  float geofence_radius  = 3;  // 50.0 meter (configurable)
+}

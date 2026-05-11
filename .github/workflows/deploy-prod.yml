@@ -1,0 +1,145 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION:   ap-southeast-1
+  PROJECT_NAME: edysup-parkirpintar
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      gateway:      ${{ steps.changes.outputs.gateway }}
+      reservation:  ${{ steps.changes.outputs.reservation }}
+      billing:      ${{ steps.changes.outputs.billing }}
+      payment:      ${{ steps.changes.outputs.payment }}
+      presence:     ${{ steps.changes.outputs.presence }}
+      notification: ${{ steps.changes.outputs.notification }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            gateway:
+              - 'services/gateway/**'
+              - 'pkg/**'
+              - 'gen/**'
+            reservation:
+              - 'services/reservation/**'
+              - 'pkg/**'
+              - 'gen/**'
+            billing:
+              - 'services/billing/**'
+              - 'pkg/**'
+              - 'gen/**'
+            payment:
+              - 'services/payment/**'
+              - 'pkg/**'
+              - 'gen/**'
+            presence:
+              - 'services/presence/**'
+              - 'pkg/**'
+              - 'gen/**'
+            notification:
+              - 'services/notification/**'
+              - 'pkg/**'
+              - 'gen/**'
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        service: [gateway, reservation, billing, payment, presence, notification]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if service changed
+        id: should-deploy
+        run: |
+          changed="${{ needs.detect-changes.outputs[matrix.service] }}"
+          echo "changed=$changed" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        if: steps.should-deploy.outputs.changed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        if: steps.should-deploy.outputs.changed == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        if: steps.should-deploy.outputs.changed == 'true'
+        id: build
+        run: |
+          IMAGE=${{ env.ECR_REGISTRY }}/${{ env.PROJECT_NAME }}-${{ matrix.service }}
+          TAG=${GITHUB_SHA::8}
+          docker build -f services/${{ matrix.service }}/Dockerfile -t $IMAGE:$TAG -t $IMAGE:prod .
+          docker push $IMAGE:$TAG
+          docker push $IMAGE:prod
+          echo "image=$IMAGE:$TAG" >> $GITHUB_OUTPUT
+
+      - name: Deploy canary (10%)
+        if: steps.should-deploy.outputs.changed == 'true'
+        id: canary
+        run: |
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition ${{ env.PROJECT_NAME }}-prod-${{ matrix.service }} \
+            --query 'taskDefinition' --output json)
+
+          NEW_TASK_DEF=$(echo $TASK_DEF | jq \
+            --arg IMAGE "${{ steps.build.outputs.image }}" \
+            '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)')
+
+          NEW_TASK_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+
+          echo "task_arn=$NEW_TASK_ARN" >> $GITHUB_OUTPUT
+
+          aws ecs update-service \
+            --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
+            --service ${{ env.PROJECT_NAME }}-prod-${{ matrix.service }} \
+            --task-definition $NEW_TASK_ARN \
+            --deployment-configuration "deploymentCircuitBreaker={enable=true,rollback=true},maximumPercent=110,minimumHealthyPercent=100" \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Monitor canary (5 min)
+        if: steps.should-deploy.outputs.changed == 'true'
+        run: |
+          echo "Monitoring canary for 5 minutes..."
+          sleep 300
+          ERROR_COUNT=$(aws cloudwatch get-metric-statistics \
+            --namespace AWS/ApplicationELB \
+            --metric-name HTTPCode_ELB_5XX_Count \
+            --start-time $(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%SZ) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --period 300 \
+            --statistics Sum \
+            --query 'Datapoints[0].Sum' --output text 2>/dev/null || echo "0")
+          echo "5xx errors in last 5 min: $ERROR_COUNT"
+          if [ "$ERROR_COUNT" != "None" ] && [ "${ERROR_COUNT%.*}" -gt 10 ]; then
+            echo "Error rate too high — circuit breaker will rollback"
+            exit 1
+          fi
+
+      - name: Wait for full rollout
+        if: steps.should-deploy.outputs.changed == 'true'
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
+            --services ${{ env.PROJECT_NAME }}-prod-${{ matrix.service }} \
+            --region ${{ env.AWS_REGION }}
+          echo "Deployed ${{ matrix.service }} to production"

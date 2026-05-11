@@ -1,0 +1,288 @@
+syntax = "proto3";
+
+package gateway.v1;
+
+option go_package = "github.com/edysupardi/parkirpintar/gen/gateway/v1;gatewayv1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "common/v1/common.proto";
+
+service GatewayService {
+
+  // GET /v1/parking/availability?vehicle_type=CAR
+  rpc GetParkingAvailability(GetParkingAvailabilityRequest)
+      returns (GetParkingAvailabilityResponse) {
+    option (google.api.http) = {
+      get: "/v1/parking/availability"
+    };
+  }
+
+  // POST /v1/reservations
+  rpc CreateReservation(CreateReservationRequest)
+      returns (CreateReservationResponse) {
+    option (google.api.http) = {
+      post: "/v1/reservations"
+      body: "*"
+    };
+  }
+
+  // GET /v1/reservations/me
+  rpc GetMyReservation(GetMyReservationRequest)
+      returns (GetMyReservationResponse) {
+    option (google.api.http) = {
+      get: "/v1/reservations/me"
+    };
+  }
+
+  // DELETE /v1/reservations/{reservation_id}
+  rpc CancelReservation(CancelReservationRequest)
+      returns (CancelReservationResponse) {
+    option (google.api.http) = {
+      delete: "/v1/reservations/{reservation_id}"
+    };
+  }
+
+  // POST /v1/reservations/{reservation_id}/check-in
+  rpc CheckIn(CheckInRequest)
+      returns (CheckInResponse) {
+    option (google.api.http) = {
+      post: "/v1/reservations/{reservation_id}/check-in"
+      body: "*"
+    };
+  }
+
+  // POST /v1/reservations/{reservation_id}/check-out
+  rpc CheckOut(CheckOutRequest)
+      returns (CheckOutResponse) {
+    option (google.api.http) = {
+      post: "/v1/reservations/{reservation_id}/check-out"
+      body: "*"
+    };
+  }
+
+  // GET /v1/invoices/{invoice_id}
+  rpc GetInvoice(GetInvoiceRequest)
+      returns (GetInvoiceResponse) {
+    option (google.api.http) = {
+      get: "/v1/invoices/{invoice_id}"
+    };
+  }
+
+  // GET /v1/billing/preview?session_id=xxx
+  rpc PreviewBilling(PreviewBillingRequest)
+      returns (PreviewBillingResponse) {
+    option (google.api.http) = {
+      get: "/v1/billing/preview"
+    };
+  }
+
+  // POST /v1/payments
+  rpc CreatePayment(CreatePaymentRequest)
+      returns (CreatePaymentResponse) {
+    option (google.api.http) = {
+      post: "/v1/payments"
+      body: "*"
+    };
+  }
+
+  // GET /v1/payments/{transaction_id}
+  rpc GetPaymentStatus(GetPaymentStatusRequest)
+      returns (GetPaymentStatusResponse) {
+    option (google.api.http) = {
+      get: "/v1/payments/{transaction_id}"
+    };
+  }
+
+  // Streaming — tidak support HTTP/1.1, skip annotation
+  rpc StreamMyLocation(stream StreamMyLocationRequest)
+      returns (stream StreamMyLocationResponse);
+}
+
+// ─────────────────────────────────────────
+// Parking Area
+// ─────────────────────────────────────────
+
+message GetParkingAvailabilityRequest {
+  common.v1.VehicleType vehicle_type = 1;
+}
+
+message GetParkingAvailabilityResponse {
+  common.v1.VehicleType vehicle_type    = 1;
+  int32                 total_capacity  = 2;
+  int32                 available_spots = 3;
+  bool                  is_available    = 4;
+  repeated FloorSummary floors          = 5;
+}
+
+message FloorSummary {
+  int32 floor           = 1;
+  int32 available_spots = 2;
+  int32 total_spots     = 3;
+}
+
+// ─────────────────────────────────────────
+// Reservation
+// ─────────────────────────────────────────
+
+message CreateReservationRequest {
+  common.v1.VehicleType    vehicle_type    = 1;
+  common.v1.AssignmentMode assignment_mode = 2;
+  string                   spot_id         = 3;
+  string                   idempotency_key = 4;
+}
+
+message CreateReservationResponse {
+  string                    reservation_id = 1;
+  common.v1.Spot            spot           = 2;
+  common.v1.ReservationStatus status       = 3;
+  google.protobuf.Timestamp confirmed_at   = 4;
+  google.protobuf.Timestamp expires_at     = 5;
+  common.v1.Money           booking_fee    = 6;
+  SpotNavigation            navigation     = 7;
+}
+
+message SpotNavigation {
+  int32  floor       = 1;
+  int32  spot_number = 2;
+  string direction   = 3;
+}
+
+message GetMyReservationRequest {}
+
+message GetMyReservationResponse {
+  bool        has_active_reservation = 1;
+  Reservation reservation            = 2;
+}
+
+message CancelReservationRequest {
+  string reservation_id = 1;
+}
+
+message CancelReservationResponse {
+  string                      reservation_id   = 1;
+  common.v1.ReservationStatus status           = 2;
+  common.v1.Money             cancellation_fee = 3;
+  string                      fee_reason       = 4;
+}
+
+message CheckInRequest {
+  string               reservation_id = 1;
+  common.v1.Coordinate coordinate     = 2;
+  string               actual_spot_id = 3;
+}
+
+message CheckInResponse {
+  string                      reservation_id = 1;
+  string                      session_id     = 2;
+  common.v1.ReservationStatus status         = 3;
+  google.protobuf.Timestamp   check_in_at    = 4;
+}
+
+message CheckOutRequest {
+  string reservation_id  = 1;
+  string idempotency_key = 2;
+}
+
+message CheckOutResponse {
+  string                    session_id       = 1;
+  string                    invoice_id       = 2;
+  google.protobuf.Timestamp check_out_at     = 3;
+  int64                     duration_minutes = 4;
+  InvoiceSummary            invoice_summary  = 5;
+}
+
+// ─────────────────────────────────────────
+// Billing
+// ─────────────────────────────────────────
+
+message GetInvoiceRequest {
+  string invoice_id = 1;
+}
+
+message GetInvoiceResponse {
+  InvoiceSummary invoice = 1;
+}
+
+message PreviewBillingRequest {
+  string session_id = 1;
+}
+
+message PreviewBillingResponse {
+  InvoiceSummary estimated = 1;
+  string         note      = 2;
+}
+
+message InvoiceSummary {
+  string          invoice_id    = 1;
+  common.v1.Money booking_fee   = 2;
+  common.v1.Money parking_fee   = 3;
+  common.v1.Money overnight_fee = 4;
+  common.v1.Money total_amount  = 5;
+  string          status        = 6;
+  int32           billed_hours  = 7;
+}
+
+// ─────────────────────────────────────────
+// Payment
+// ─────────────────────────────────────────
+
+message CreatePaymentRequest {
+  string                  invoice_id      = 1;
+  common.v1.PaymentMethod payment_method  = 2;
+  string                  idempotency_key = 3;
+}
+
+message CreatePaymentResponse {
+  string                    transaction_id = 1;
+  common.v1.PaymentMethod   payment_method = 2;
+  string                    payment_url    = 3;
+  string                    qr_string      = 4;
+  string                    va_number      = 5;
+  string                    va_bank        = 6;
+  google.protobuf.Timestamp expired_at     = 7;
+}
+
+message GetPaymentStatusRequest {
+  string transaction_id = 1;
+}
+
+message GetPaymentStatusResponse {
+  string                    transaction_id = 1;
+  string                    status         = 2;
+  common.v1.Money           amount         = 3;
+  google.protobuf.Timestamp paid_at        = 4;
+}
+
+// ─────────────────────────────────────────
+// Presence (streaming)
+// ─────────────────────────────────────────
+
+message StreamMyLocationRequest {
+  string                    session_id     = 1;
+  string                    reservation_id = 2;
+  common.v1.Coordinate      coordinate     = 3;
+  google.protobuf.Timestamp recorded_at    = 4;
+}
+
+message StreamMyLocationResponse {
+  string event_type         = 1;
+  bool   in_geofence        = 2;
+  float  distance_to_spot   = 3;
+  bool   check_in_triggered = 4;
+  string message            = 5;
+}
+
+// ─────────────────────────────────────────
+// Shared
+// ─────────────────────────────────────────
+
+message Reservation {
+  string                      reservation_id = 1;
+  common.v1.Spot              spot           = 2;
+  common.v1.ReservationStatus status         = 3;
+  google.protobuf.Timestamp   confirmed_at   = 4;
+  google.protobuf.Timestamp   expires_at     = 5;
+  google.protobuf.Timestamp   check_in_at    = 6;
+  string                      session_id     = 7;
+}

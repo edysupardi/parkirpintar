@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package notification.v1;
+
+option go_package = "github.com/edysupardi/parkirpintar/gen/notification/v1;notificationv1";
+
+import "google/protobuf/timestamp.proto";
+
+// ─────────────────────────────────────────
+// Service Definition
+// ─────────────────────────────────────────
+
+// NotificationService mengirim notifikasi ke driver
+// via FCM (push) dan Amazon SES (email).
+//
+// Dalam konteks asesmen ini, service ini mengimplementasikan
+// interface lengkap tetapi provider dapat dikonfigurasi
+// antara real (FCM/SES) dan stub (untuk testing).
+service NotificationService {
+  // Kirim notifikasi ke satu driver
+  rpc SendNotification(SendNotificationRequest)
+      returns (SendNotificationResponse);
+
+  // Kirim notifikasi ke banyak driver sekaligus
+  rpc BroadcastNotification(BroadcastNotificationRequest)
+      returns (BroadcastNotificationResponse);
+
+  // Ambil history notifikasi driver
+  rpc GetNotificationHistory(GetNotificationHistoryRequest)
+      returns (GetNotificationHistoryResponse);
+}
+
+// ─────────────────────────────────────────
+// SendNotification
+// ─────────────────────────────────────────
+
+message SendNotificationRequest {
+  string           driver_id   = 1;
+  NotificationChannel channel = 2;  // PUSH, EMAIL, atau BOTH
+  TemplateID       template_id = 3;
+  map<string, string> data     = 4;  // template variables
+  string           priority    = 5;  // "high" atau "normal" (untuk FCM)
+}
+
+message SendNotificationResponse {
+  bool   success         = 1;
+  string notification_id = 2;
+  string error_message   = 3;  // diisi kalau success = false
+}
+
+// ─────────────────────────────────────────
+// BroadcastNotification
+// ─────────────────────────────────────────
+
+message BroadcastNotificationRequest {
+  repeated string  driver_ids  = 1;
+  NotificationChannel channel  = 2;
+  TemplateID       template_id = 3;
+  map<string, string> data     = 4;
+}
+
+message BroadcastNotificationResponse {
+  int32 total_sent   = 1;
+  int32 total_failed = 2;
+  repeated string failed_driver_ids = 3;
+}
+
+// ─────────────────────────────────────────
+// GetNotificationHistory
+// ─────────────────────────────────────────
+
+message GetNotificationHistoryRequest {
+  string driver_id = 1;
+  int32  limit     = 2;  // default 20
+  int32  offset    = 3;
+}
+
+message GetNotificationHistoryResponse {
+  repeated NotificationRecord records = 1;
+  int32                       total   = 2;
+}
+
+message NotificationRecord {
+  string              notification_id = 1;
+  string              driver_id       = 2;
+  NotificationChannel channel         = 3;
+  TemplateID          template_id     = 4;
+  NotificationStatus  status          = 5;
+  string              error_message   = 6;
+  google.protobuf.Timestamp sent_at   = 7;
+}
+
+// ─────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────
+
+enum NotificationChannel {
+  NOTIFICATION_CHANNEL_UNSPECIFIED = 0;
+  NOTIFICATION_CHANNEL_PUSH        = 1;  // FCM
+  NOTIFICATION_CHANNEL_EMAIL       = 2;  // Amazon SES
+  NOTIFICATION_CHANNEL_BOTH        = 3;  // Push + Email
+}
+
+// Template ID mendefinisikan jenis notifikasi
+// Setiap template punya copy dan channel default-nya sendiri
+enum TemplateID {
+  TEMPLATE_ID_UNSPECIFIED             = 0;
+
+  // Reservation events
+  TEMPLATE_ID_RESERVATION_CONFIRMED  = 1;  // Push + Email
+  TEMPLATE_ID_RESERVATION_EXPIRING   = 2;  // Push (30 menit sebelum expired)
+  TEMPLATE_ID_RESERVATION_EXPIRED    = 3;  // Push + Email
+  TEMPLATE_ID_RESERVATION_CANCELLED  = 4;  // Push + Email
+
+  // Parking session events
+  TEMPLATE_ID_CHECK_IN_SUCCESS       = 5;  // Push
+  TEMPLATE_ID_CHECK_OUT_SUCCESS      = 6;  // Push
+  TEMPLATE_ID_WRONG_SPOT_PENALTY     = 7;  // Push + Email
+
+  // Payment events
+  TEMPLATE_ID_PAYMENT_SUCCESS        = 8;  // Push + Email (receipt)
+  TEMPLATE_ID_PAYMENT_FAILED         = 9;  // Push + Email
+  TEMPLATE_ID_INVOICE_GENERATED      = 10; // Push + Email
+}
+
+enum NotificationStatus {
+  NOTIFICATION_STATUS_UNSPECIFIED = 0;
+  NOTIFICATION_STATUS_SENT        = 1;
+  NOTIFICATION_STATUS_FAILED      = 2;
+  NOTIFICATION_STATUS_SKIPPED     = 3;  // driver tidak punya FCM token / email
+}
