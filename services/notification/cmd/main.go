@@ -11,6 +11,7 @@ import (
 	notificationv1 "github.com/edysupardi/parkirpintar/gen/notification/v1"
 	"github.com/edysupardi/parkirpintar/pkg/config"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
+	"github.com/edysupardi/parkirpintar/pkg/tracer"
 	"github.com/edysupardi/parkirpintar/pkg/mq"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/handler"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/provider"
@@ -31,6 +32,13 @@ func main() {
 	}
 
 	log := logger.New(logger.Config{Service: "notification", Level: "info"})
+
+	_, tracerShutdown, err := tracer.Init(ctx, "notification")
+	if err != nil {
+		log.Warn(ctx).Err(err).Msg("failed to init tracer")
+	} else {
+		defer func() { _ = tracerShutdown(ctx) }()
+	}
 
 	push := provider.NewStubPush(log)
 	email := provider.NewStubEmail(log)

@@ -22,6 +22,7 @@ import (
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/publisher"
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/repository"
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/usecase"
+	"github.com/edysupardi/parkirpintar/pkg/tracer"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -42,6 +43,13 @@ func main() {
 		Service: "reservation",
 		Level:   "info",
 	})
+
+	_, tracerShutdown, err := tracer.Init(ctx, "reservation")
+	if err != nil {
+		log.Warn(ctx).Err(err).Msg("failed to init tracer")
+	} else {
+		defer func() { _ = tracerShutdown(ctx) }()
+	}
 
 	// database
 	db, err := database.New(ctx, database.Config{

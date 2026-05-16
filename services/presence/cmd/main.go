@@ -12,6 +12,7 @@ import (
 	"github.com/edysupardi/parkirpintar/pkg/config"
 	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
+	"github.com/edysupardi/parkirpintar/pkg/tracer"
 	"github.com/edysupardi/parkirpintar/services/presence/internal/handler"
 	"github.com/edysupardi/parkirpintar/services/presence/internal/repository"
 	"google.golang.org/grpc"
@@ -30,6 +31,13 @@ func main() {
 	}
 
 	log := logger.New(logger.Config{Service: "presence", Level: "info"})
+
+	_, tracerShutdown, err := tracer.Init(ctx, "presence")
+	if err != nil {
+		log.Warn(ctx).Err(err).Msg("failed to init tracer")
+	} else {
+		defer func() { _ = tracerShutdown(ctx) }()
+	}
 
 	db, err := database.New(ctx, database.Config{
 		Host:         cfg.Database.Host,
