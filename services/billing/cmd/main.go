@@ -13,8 +13,10 @@ import (
 	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/idempotency"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
+	"github.com/edysupardi/parkirpintar/pkg/mq"
 	"github.com/edysupardi/parkirpintar/services/billing/internal/handler"
 	"github.com/edysupardi/parkirpintar/services/billing/internal/repository"
+	"github.com/edysupardi/parkirpintar/services/billing/internal/subscriber"
 	"github.com/edysupardi/parkirpintar/services/billing/internal/usecase"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
@@ -55,6 +57,20 @@ func main() {
 	repo := repository.New(db.Pool())
 	idempotencyStore := idempotency.New(rdb)
 	uc := usecase.New(repo, idempotencyStore, log)
+
+	// MQ consumer for checkout events
+	mqConsumer, err := mq.NewConsumer(cfg.RabbitMQ.URL)
+	if err != nil {
+		log.Warn(ctx).Err(err).Msg("failed to connect to RabbitMQ, billing subscriber disabled")
+	} else {
+		defer mqConsumer.Close()
+		sub := subscriber.New(uc, log)
+		if err := sub.Register(mqConsumer); err != nil {
+			log.Warn(ctx).Err(err).Msg("failed to register billing subscriber")
+		} else {
+			log.Info(ctx).Msg("billing MQ subscriber registered")
+		}
+	}
 
 	
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.UnaryServerLogger(log)))

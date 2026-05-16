@@ -15,9 +15,11 @@ import (
 	"github.com/edysupardi/parkirpintar/pkg/idempotency"
 	"github.com/edysupardi/parkirpintar/pkg/lock"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
+	"github.com/edysupardi/parkirpintar/pkg/mq"
 	pkgredis "github.com/edysupardi/parkirpintar/pkg/redis"
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/domain"
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/handler"
+	"github.com/edysupardi/parkirpintar/services/reservation/internal/publisher"
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/repository"
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/usecase"
 	"github.com/redis/go-redis/v9"
@@ -74,10 +76,23 @@ func main() {
 	locker := lock.New(rdb)
 	idempotencyStore := idempotency.New(rdb)
 
-	// stub publisher — replaced when mq package is implemented
-	publisher := &stubPublisher{}
+	// mq publisher
+	mqPub, err := mq.NewPublisher(cfg.RabbitMQ.URL)
+	if err != nil {
+		log.Warn(ctx).Err(err).Msg("failed to connect to RabbitMQ, using stub publisher")
+	}
 
-	uc := usecase.New(repo, locker, publisher, idempotencyStore, log)
+	var pub domain.EventPublisher
+	if mqPub != nil {
+		pub = publisher.New(mqPub)
+		defer mqPub.Close()
+		log.Info(ctx).Msg("using MQ publisher")
+	} else {
+		pub = &stubPublisher{}
+		log.Info(ctx).Msg("using stub publisher")
+	}
+
+	uc := usecase.New(repo, locker, pub, idempotencyStore, log)
 
 	// expiry background job
 	go runExpiryJob(ctx, uc, log)

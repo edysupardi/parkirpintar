@@ -11,8 +11,10 @@ import (
 	notificationv1 "github.com/edysupardi/parkirpintar/gen/notification/v1"
 	"github.com/edysupardi/parkirpintar/pkg/config"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
+	"github.com/edysupardi/parkirpintar/pkg/mq"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/handler"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/provider"
+	"github.com/edysupardi/parkirpintar/services/notification/internal/subscriber"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
@@ -34,6 +36,20 @@ func main() {
 	email := provider.NewStubEmail(log)
 
 	_ = cfg // cfg used when real FCM/SES providers are wired
+
+	// MQ consumer for all reservation events
+	mqConsumer, err := mq.NewConsumer(cfg.RabbitMQ.URL)
+	if err != nil {
+		log.Warn(ctx).Err(err).Msg("failed to connect to RabbitMQ, notification subscriber disabled")
+	} else {
+		defer mqConsumer.Close()
+		sub := subscriber.New(push, log)
+		if err := sub.Register(mqConsumer); err != nil {
+			log.Warn(ctx).Err(err).Msg("failed to register notification subscriber")
+		} else {
+			log.Info(ctx).Msg("notification MQ subscriber registered")
+		}
+	}
 
 	
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.UnaryServerLogger(log)))
