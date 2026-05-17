@@ -35,8 +35,8 @@ ParkirPintar adalah sistem smart parking berbasis microservices yang memungkinka
 - Reservation dengan Redis inventory lock untuk mencegah double-booking
 - Billing dihitung dari actual parking session duration
 - Real-time location tracking via presence service
-- Payment via Midtrans: QRIS, Virtual Account, GoPay, OVO, Dana
-- Notification via FCM (push) dan Amazon SES (email)
+- Payment via Midtrans: QRIS (scannable by all e-wallets), Virtual Account
+- Notification via FCM (push) dan Amazon SES (email) — stub-able untuk testing
 
 ---
 
@@ -46,8 +46,8 @@ ParkirPintar adalah sistem smart parking berbasis microservices yang memungkinka
 |---|--------|--------|
 | A1 | Sistem hanya melayani 1 area parkir (single-tenant) | Sesuai soal: "single, fixed parking area" |
 | A2 | Tidak ada Host onboarding - spot sudah pre-seeded di database | Sesuai soal: "centralized inventory", tidak ada multi-host |
-| A3 | Driver diasumsikan sudah authenticated via super app (JWT diterima as-is) | Sesuai soal: "mini app inside a super app" |
-| A4 | Geofence / auto check-in tidak diimplementasi — check-in dilakukan manual oleh Driver | Tidak ada di requirement |
+| A3 | Driver register/login via gateway service (JWT issued by system) | Self-contained auth untuk assessment |
+| A4 | Geofence / auto check-in tidak diimplementasi — dihapus dari requirement | Tidak ada di requirement asesmen final |
 | A5 | Timezone sistem adalah WIB (UTC+7) untuk overnight fee | Konteks Jakarta |
 | A6 | "Crossing midnight" = session melewati 00:00 WIB | Kalkulasi overnight fee |
 | A7 | Satu driver hanya boleh punya 1 active reservation pada satu waktu | Mencegah abuse |
@@ -84,7 +84,7 @@ Location updates (presence):
   = 400 / 30 ≈ 13 writes/detik
 ```
 
-> Sistem ini adalah **LOW traffic system**. Ini menjustifikasi pilihan ECS Fargate (bukan EKS), Aurora Serverless v2 (bukan RDS provisioned), dan Amazon MQ RabbitMQ (bukan Kafka).
+> Sistem ini adalah **LOW traffic system**. Ini menjustifikasi pilihan ECS Fargate (bukan EKS), Aurora Serverless v2 (bukan RDS provisioned), dan RabbitMQ on ECS (bukan Kafka/Amazon MQ managed).
 
 ---
 
@@ -99,7 +99,7 @@ graph TD
     GW -->|gRPC/NLB| RS[Reservation Service]
     GW -->|gRPC/NLB| BS[Billing Service]
     GW -->|gRPC/NLB| PS[Presence Service]
-    RS & BS & PS --> MQ[Amazon MQ RabbitMQ]
+    RS & BS & PS --> MQ[RabbitMQ on ECS]
     MQ --> PAY[Payment Service]
     MQ --> NOTIF[Notification Service]
     MQ --> BC[Billing Consumer]
@@ -122,13 +122,13 @@ graph TD
 | Notification Service | Go + gRPC | FCM push + SES email (stub-able) |
 | Aurora Serverless v2 | PostgreSQL-compatible | Primary datastore |
 | ElastiCache Serverless | Redis 7.x | Distributed lock, idempotency, cache |
-| Amazon MQ | RabbitMQ 3.x | Async event bus antar services |
+| RabbitMQ on ECS | RabbitMQ 3.13 | Async event bus antar services (Cloud Map DNS) |
 
 ---
 
 ## 5. Low Level Design (LLD)
 
-## Service Communication
+### Service Communication
 
 ```mermaid
 flowchart TD
@@ -151,7 +151,7 @@ flowchart TD
 
 ---
 
-## Event Flow — Async via RabbitMQ
+### Event Flow — Async via RabbitMQ
 
 ```mermaid
 flowchart LR
@@ -161,7 +161,7 @@ flowchart LR
         PAY[Payment Service]
     end
 
-    subgraph MQ[Amazon MQ - RabbitMQ]
+    subgraph MQ[RabbitMQ on ECS]
         E1([ReservationConfirmed])
         E2([ReservationExpired])
         E3([CheckInDetected])
@@ -194,7 +194,7 @@ flowchart LR
 
 ---
 
-## Reservation State Machine
+### Reservation State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -220,7 +220,7 @@ stateDiagram-v2
 
 ---
 
-## Redis Inventory Lock — Anti Double-Booking
+### Redis Inventory Lock — Anti Double-Booking
 
 ```mermaid
 flowchart TD
@@ -244,7 +244,7 @@ flowchart TD
 
 ---
 
-## Idempotency Pattern
+### Idempotency Pattern
 
 ```mermaid
 flowchart TD
@@ -266,7 +266,7 @@ flowchart TD
 
 ---
 
-## Circuit Breaker — Graceful Degradation
+### Circuit Breaker — Graceful Degradation
 
 ```mermaid
 stateDiagram-v2
@@ -284,12 +284,15 @@ stateDiagram-v2
 **Non-core service failures** — Notification, Presence:
 - Log error, lanjutkan main flow
 - Circuit breaker: CLOSED → OPEN → HALF-OPEN
+
 **Core service failures** — Reservation, Billing:
 - Return error ke client dengan retry guidance
 - Dead letter queue untuk failed events
+
+**Implementasi:** `pkg/circuitbreaker` (sony/gobreaker) di-wire sebagai gRPC client interceptor di gateway — setiap call ke downstream service (reservation, billing, payment, presence) di-wrap circuit breaker dengan threshold 50% failure rate.
 ---
 
-## Pricing Engine Rules
+### Pricing Engine Rules
 
 | Rule | Value |
 |------|-------|
@@ -393,7 +396,7 @@ notif_logs  parking_sessions
 | Container | ECS Fargate | EKS, GKE | EKS charge $73/bln hanya control plane. Capacity planning menunjukkan ~0.033 RPS - ECS Fargate jauh lebih cost-efficient untuk skala ini |
 | Database | Aurora Serverless v2 | RDS PostgreSQL, DynamoDB | Traffic bersifat peak-hour. Aurora scale 0.5–128 ACU otomatis. DynamoDB tidak cocok untuk skema relasional kompleks ini |
 | Cache/Lock | ElastiCache Serverless Redis | Memcached, self-hosted Redis | Redis SET NX adalah primitive paling tepat untuk distributed lock. Soal secara eksplisit menyebut Redis-based lock |
-| Message Queue | Amazon MQ (RabbitMQ) | Kafka (MSK), SQS+SNS | Kafka untuk jutaan events/detik. Sistem ini ~1.600 events/hari - Kafka over-engineering. RabbitMQ AMQP lebih fleksibel dari SQS untuk fan-out pattern |
+| Message Queue | RabbitMQ on ECS Fargate | Kafka (MSK), SQS+SNS, Amazon MQ | Kafka untuk jutaan events/detik. Sistem ini ~1.600 events/hari - Kafka over-engineering. Amazon MQ managed minimum mq.m5.large (~$216/bln) - overkill untuk dev. RabbitMQ on ECS via Cloud Map service discovery: cost ~$3/bln, same AMQP protocol |
 | Load Balancer | ALB (external) + NLB (internal) + client-side LB | ALB only, App Mesh | NLB TCP pass-through untuk gRPC internal dikombinasikan dengan client-side load balancing (DNS round-robin via ECS Service Discovery). ALB untuk REST external karena support WAF dan routing rules. ALB internal bisa distribute gRPC lebih merata tapi tambah latency dan cost — trade-off yang tidak worth untuk skala ini |
 | Payment | Midtrans | Xendit, Stripe | Stripe tidak support QRIS/VA Indonesia/e-wallet lokal. Midtrans cover semua dalam satu integrasi|
 | IaC | Terraform | AWS CDK, CloudFormation | Industry standard, multi-cloud, AWS provider paling mature, paling mudah di-review oleh siapapun |
@@ -407,10 +410,10 @@ notif_logs  parking_sessions
 
 | AWS Service | Fungsi | Tier / Sizing |
 |-------------|--------|---------------|
-| ECS Fargate | Container runtime | Per-task billing |
+| ECS Fargate | Container runtime (6 services + RabbitMQ) | Per-task billing |
 | Aurora Serverless v2 | Primary PostgreSQL | 0.5–4 ACU auto-scale |
 | ElastiCache Serverless | Redis lock + cache | On-demand |
-| Amazon MQ | RabbitMQ event broker | mq.t3.micro |
+| RabbitMQ on ECS | Message broker (Cloud Map DNS) | 0.25 vCPU / 512MB |
 | ALB | External HTTPS load balancer | - |
 | NLB | Internal gRPC load balancer | - |
 | ECR | Docker image registry | - |
@@ -424,31 +427,31 @@ notif_logs  parking_sessions
 
 | Komponen | Est./bulan |
 |----------|------------|
-| ECS Fargate (6 services, minimal) | ~$30–50 |
+| ECS Fargate (7 tasks: 6 services + RabbitMQ) | ~$30–50 |
 | Aurora Serverless v2 (0.5 ACU idle) | ~$20–30 |
 | ElastiCache Serverless | ~$10–15 |
-| Amazon MQ t3.micro | ~$15 |
 | ALB + NLB | ~$20 |
+| NAT Gateway | ~$30 |
 | ECR, CloudWatch, misc | ~$10 |
-| **Total Dev** | **~$105–140/bln** |
+| **Total Dev** | **~$120–155/bln** |
+
+> Tip: Gunakan `./scripts/destroy-infra.sh` untuk tear down saat tidak dipakai. Cost hanya terhitung saat infra aktif.
 
 ### Terraform Structure
 
 ```
 terraform/
-├── versions.tf
-├── variables.tf
 ├── modules/
-│   ├── networking/      ← VPC, subnets, security groups
+│   ├── networking/      ← VPC, subnets, NAT, security groups
 │   ├── ecs/             ← Cluster, task definitions, services
 │   ├── rds/             ← Aurora Serverless v2
 │   ├── elasticache/     ← Redis Serverless
-│   ├── load-balancer/   ← ALB + NLB
-│   ├── mq/              ← Amazon MQ
-│   └── monitoring/      ← CloudWatch + alarms
+│   ├── load-balancer/   ← ALB (HTTP/HTTPS) + NLB (gRPC)
+│   ├── mq/              ← RabbitMQ on ECS + Cloud Map
+│   └── monitoring/      ← CloudWatch dashboard + alarms + SNS
 └── environments/
-    ├── dev/             ← minimal sizing
-    └── prod/            ← production sizing + auto-scaling
+    ├── dev/             ← minimal sizing, HTTP-only
+    └── prod/            ← production sizing + HTTPS + auto-scaling
 ```
 
 ---
@@ -477,24 +480,34 @@ Deploy v2 ke 50% → Monitor → 100%
 
 ## 11. CI/CD Pipeline
 
+### GitHub Actions Workflows
+
+| Workflow | Trigger | Steps |
+|----------|---------|-------|
+| `ci.yml` | Push/PR to develop, main | Lint → Unit tests → Integration tests → E2E tests → Build |
+| `deploy-dev.yml` | Push to develop (path-based) | OIDC auth → Build → Push ECR → Rolling update ECS |
+| `deploy-prod.yml` | Push to main (path-based) / manual | OIDC auth → Build → Push ECR → Canary 10% → Monitor 5min → Full rollout |
+
+### Pipeline Flow
+
 ```
-feature branch push
-  ├── Lint (golangci-lint)
-  ├── Unit tests
-  └── Build Docker image
+Push to develop
+  ├── CI: lint + test-pkg + test-integration + test-e2e + build
+  └── Deploy Dev: build image → push ECR → rolling update ECS
 
-PR ke develop
-  ├── Code review
-  └── Merge → auto deploy staging
-              ├── E2E tests
-              └── Security scan (trivy)
+PR develop → main
+  └── CI runs on PR
 
-PR ke main
-  └── Canary deploy production
-      └── Auto-rollback jika error rate > threshold
+Merge to main (services/pkg/gen changes only)
+  └── Deploy Prod: build → push → canary 10% → monitor → full rollout
+      └── Circuit breaker auto-rollback if error rate > threshold
 ```
 
-Path-based trigger: hanya service yang berubah yang di-build ulang.
+### Security
+
+- **No static credentials** — GitHub Actions uses OIDC (OpenID Connect) to assume IAM role
+- **Secrets in AWS Secrets Manager** — DB password, JWT secret, Midtrans keys
+- **Path-based triggers** — only changed services get rebuilt and deployed
 
 ---
 
@@ -537,6 +550,11 @@ Request Logger → Rate Limiter → CORS → Auth → Handler
 Logger Interceptor → Handler
 ```
 
+**gRPC client interceptor (gateway → downstream):**
+```
+Circuit Breaker → OTel Trace → gRPC Call
+```
+
 ### Tools
 
 | Tool | Fungsi |
@@ -544,8 +562,8 @@ Logger Interceptor → Handler
 | CloudWatch Logs | Centralized logs dari semua ECS tasks |
 | CloudWatch Metrics | Infrastructure metrics |
 | CloudWatch Alarms | Alert + auto-scaling trigger |
-| AWS X-Ray | Distributed tracing - request dari Gateway ke Billing |
-| OpenTelemetry SDK | Instrumentasi kode, vendor-neutral |
+| OpenTelemetry SDK | Distributed tracing — stdout exporter (dev), propagasi via TraceContext header |
+| otelgrpc | Auto-instrument semua gRPC client calls di gateway |
 
 ---
 
@@ -629,6 +647,7 @@ Event publishing dan consuming via RabbitMQ
 | E2E-10 | Payment QRIS - failure | ✅ |
 | E2E-11 | Payment Virtual Account - VA number + settlement | ✅ |
 | E2E-12 | Duplicate webhook - idempotent, no double-charge | ✅ |
+| E2E-13 | Wrong-spot check-in — check-in rejected (spot mismatch) | ✅ |
 
 ---
 
@@ -645,8 +664,9 @@ Event publishing dan consuming via RabbitMQ
 | `github.com/rabbitmq/amqp091-go` | RabbitMQ client | Official AMQP client |
 | `github.com/jackc/pgx/v5` | PostgreSQL driver | Performa lebih baik dari lib/pq |
 | `github.com/golang-migrate/migrate/v4` | DB migrations | Version control untuk schema |
-| `github.com/sony/gobreaker` | Circuit breaker | Graceful degradation |
+| `github.com/sony/gobreaker` | Circuit breaker | Graceful degradation — wired di gateway gRPC client interceptor |
 | `go.opentelemetry.io/otel` | Distributed tracing | Vendor-neutral, industry standard |
+| `go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc` | gRPC OTel instrumentation | Auto-trace semua gRPC client calls |
 | `firebase.google.com/go/v4` | FCM push notification | Official Firebase SDK |
 | `github.com/aws/aws-sdk-go-v2` | AWS SDK (SES) | Official AWS SDK |
 | `github.com/midtrans/midtrans-go` | Payment gateway | Official Midtrans Go SDK |
@@ -660,12 +680,14 @@ Event publishing dan consuming via RabbitMQ
 
 ### Prerequisites
 
-- Go 1.22+
+- Go 1.25+
 - Docker & Docker Compose
 - `buf` CLI untuk proto generation
 - `golang-migrate` CLI untuk database migration
+- AWS CLI (untuk deployment ke AWS)
+- Terraform >= 1.7 (untuk infrastructure provisioning)
 
-### Quick Start
+### Quick Start (Local - Docker Compose)
 
 ```bash
 # 1. Clone repository
@@ -676,34 +698,58 @@ cd parkirpintar
 cp .env.example .env
 # Edit .env sesuai kebutuhan
 
-# 3. Start dependencies
-make deps-up
+# 3. Start all services (DB, Redis, RabbitMQ, 6 microservices)
+docker compose up -d
 
-# 4. Generate proto
-make proto
+# 4. Verify
+curl http://localhost:8080/healthz
+# → ok
+```
 
-# 5. Run migrations
-make migrate-up
+### Quick Start (AWS Deployment)
 
-# 6. Seed parking spots (400 spots)
-make seed
+```bash
+# Prerequisites: AWS CLI configured, Docker running, Terraform installed
 
-# 7. Run semua services
-make run-all
+# 1. Deploy infrastructure + build + push + run
+./scripts/deploy-infra.sh
+
+# 2. Run database migrations
+./scripts/run-migrations.sh up
+
+# 3. Seed parking spots (400 spots)
+./scripts/run-seed.sh
+
+# 4. Verify
+curl http://<ALB_DNS>/healthz
+# → ok
+
+# 5. Tear down (cost saving)
+./scripts/destroy-infra.sh
 ```
 
 ### Run Tests
 
 ```bash
-make test-unit          # unit tests (pkg/)
-make test-integration   # integration tests (requires Docker)
-make test-e2e           # semua 12 e2e scenarios (requires Docker)
-make test-coverage      # coverage report → coverage.html
+# Unit tests (pkg/)
+go test ./pkg/... -v -race
 
-# Manual run with build tags:
-go test ./pkg/... -v                                    # unit tests
-go test -tags integration ./tests/integration/... -v    # integration
-go test -tags e2e ./tests/e2e/... -v                    # e2e
+# Integration tests (requires Docker - testcontainers)
+go test -tags integration ./tests/integration/... -v
+
+# E2E tests - all 12 scenarios (requires Docker - testcontainers)
+go test -tags e2e ./tests/e2e/... -v
+
+# Coverage report
+go test ./pkg/... -coverprofile=coverage.out
+go tool cover -html=coverage.out -o coverage.html
+```
+
+### API Documentation
+
+Swagger/OpenAPI spec tersedia di:
+```
+GET /swagger.json
 ```
 
 ### Environment Variables

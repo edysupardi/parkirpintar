@@ -126,13 +126,13 @@ module "ecs" {
         { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
         { name = "REDIS_TLS", value = "true" },
-        { name = "RESERVATION_HOST", value = "edysup-parkirpintar-dev-nlb-c3b727dbddc83273.elb.ap-southeast-1.amazonaws.com" },
+        { name = "RESERVATION_HOST", value = module.load_balancer.nlb_dns_name },
         { name = "RESERVATION_GRPC_PORT", value = "9091" },
-        { name = "BILLING_HOST", value = "edysup-parkirpintar-dev-nlb-c3b727dbddc83273.elb.ap-southeast-1.amazonaws.com" },
+        { name = "BILLING_HOST", value = module.load_balancer.nlb_dns_name },
         { name = "BILLING_GRPC_PORT", value = "9092" },
-        { name = "PAYMENT_HOST", value = "edysup-parkirpintar-dev-nlb-c3b727dbddc83273.elb.ap-southeast-1.amazonaws.com" },
+        { name = "PAYMENT_HOST", value = module.load_balancer.nlb_dns_name },
         { name = "PAYMENT_GRPC_PORT", value = "9093" },
-        { name = "PRESENCE_HOST", value = "edysup-parkirpintar-dev-nlb-c3b727dbddc83273.elb.ap-southeast-1.amazonaws.com" },
+        { name = "PRESENCE_HOST", value = module.load_balancer.nlb_dns_name },
         { name = "PRESENCE_GRPC_PORT", value = "9094" },
       ]
       secrets = [

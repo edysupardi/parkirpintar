@@ -13,6 +13,7 @@ import (
 	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/idempotency"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
+	"github.com/edysupardi/parkirpintar/pkg/tracer"
 	"github.com/edysupardi/parkirpintar/services/payment/internal/domain"
 	"github.com/edysupardi/parkirpintar/services/payment/internal/gateway"
 	"github.com/edysupardi/parkirpintar/services/payment/internal/handler"
@@ -35,6 +36,13 @@ func main() {
 	}
 
 	log := logger.New(logger.Config{Service: "payment", Level: "info"})
+
+	_, tracerShutdown, err := tracer.Init(ctx, "payment")
+	if err != nil {
+		log.Warn(ctx).Err(err).Msg("failed to init tracer")
+	} else {
+		defer func() { _ = tracerShutdown(ctx) }()
+	}
 
 	db, err := database.New(ctx, database.Config{
 		Host:         cfg.Database.Host,

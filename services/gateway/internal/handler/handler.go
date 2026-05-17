@@ -175,6 +175,19 @@ func (h *GatewayHandler) CheckIn(ctx context.Context, req *gatewayv1.CheckInRequ
 		return nil, status.Error(codes.Unauthenticated, "missing user id")
 	}
 
+	// Validate actual spot matches booked spot
+	if req.ActualSpotId != "" {
+		resDetail, err := h.reservation.GetReservation(ctx, &reservationv1.GetReservationRequest{
+			ReservationId: req.ReservationId,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if resDetail.Reservation != nil && resDetail.Reservation.Spot.SpotId != req.ActualSpotId {
+			return nil, status.Error(codes.FailedPrecondition, "wrong spot: actual spot does not match booked spot")
+		}
+	}
+
 	resp, err := h.reservation.CheckIn(ctx, &reservationv1.CheckInRequest{
 		ReservationId: req.ReservationId,
 		DriverId:      driverID,
@@ -183,6 +196,7 @@ func (h *GatewayHandler) CheckIn(ctx context.Context, req *gatewayv1.CheckInRequ
 	if err != nil {
 		return nil, err
 	}
+
 	return &gatewayv1.CheckInResponse{
 		ReservationId: resp.ReservationId,
 		SessionId:     resp.SessionId,

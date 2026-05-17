@@ -18,11 +18,14 @@ import (
 	presencev1 "github.com/edysupardi/parkirpintar/gen/presence/v1"
 	reservationv1 "github.com/edysupardi/parkirpintar/gen/reservation/v1"
 	"github.com/edysupardi/parkirpintar/pkg/auth"
+	"github.com/edysupardi/parkirpintar/pkg/circuitbreaker"
 	"github.com/edysupardi/parkirpintar/pkg/config"
 	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
+	"github.com/edysupardi/parkirpintar/pkg/tracer"
 	"github.com/edysupardi/parkirpintar/services/gateway/internal/handler"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health"
@@ -45,6 +48,14 @@ func main() {
 
 	log := logger.New(logger.Config{Service: "gateway", Level: "info"})
 
+	// tracer
+	_, tracerShutdown, err := tracer.Init(ctx, "gateway")
+	if err != nil {
+		log.Warn(ctx).Err(err).Msg("failed to init tracer, continuing without tracing")
+	} else {
+		defer func() { _ = tracerShutdown(ctx) }()
+	}
+
 	// database (for auth endpoints)
 	db, err := database.New(ctx, database.Config{
 		Host:         cfg.Database.Host,
@@ -62,9 +73,18 @@ func main() {
 	defer db.Close()
 
 	dial := func(addr string) *grpc.ClientConn {
+		cb := circuitbreaker.New[any](circuitbreaker.DefaultConfig(addr))
+		cbInterceptor := func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			_, err := cb.Execute(func() (any, error) {
+				return nil, invoker(ctx, method, req, reply, cc, opts...)
+			})
+			return err
+		}
 		conn, err := grpc.NewClient(addr,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+			grpc.WithUnaryInterceptor(cbInterceptor),
 		)
 		if err != nil {
 			log.Fatal(ctx).Err(err).Str("addr", addr).Msg("failed to connect")

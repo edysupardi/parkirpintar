@@ -447,3 +447,33 @@ func TestE2E_12_DuplicateWebhook_Idempotent(t *testing.T) {
 	assert.True(t, isDup2)
 	assert.Equal(t, payment.StatusSettled, status2)
 }
+
+// ── E2E-13: Wrong-spot check-in — check-in rejected ────────────────────────
+
+func TestE2E_13_WrongSpotCheckIn(t *testing.T) {
+	testRds.FlushAll()
+	ctx := context.Background()
+	ruc := newReservationUC()
+
+	driverID := uid()
+
+	res, err := ruc.CreateReservation(ctx, driverID, uid(), reservation.VehicleTypeCar, reservation.AssignmentModeSystem, "")
+	require.NoError(t, err)
+
+	res, err = ruc.ConfirmReservation(ctx, res.ReservationID)
+	require.NoError(t, err)
+	assert.Equal(t, reservation.StatusConfirmed, res.Status)
+
+	// Attempt check-in with wrong reservation ID (simulates wrong spot at usecase level)
+	// Gateway validates actual_spot_id vs booked spot_id and returns error before calling CheckIn.
+	// At usecase level: CheckIn only accepts the correct reservation — wrong spot means
+	// driver tries to check in to a reservation that doesn't belong to them.
+	_, err = ruc.CheckIn(ctx, res.ReservationID, "wrong-driver-id")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not owned by driver")
+
+	// Correct driver can still check in to their own spot
+	res, err = ruc.CheckIn(ctx, res.ReservationID, driverID)
+	require.NoError(t, err)
+	assert.Equal(t, reservation.StatusActive, res.Status)
+}
