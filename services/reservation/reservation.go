@@ -3,14 +3,17 @@ package reservation
 import (
 	"context"
 
+	reservationv1 "github.com/edysupardi/parkirpintar/gen/reservation/v1"
 	"github.com/edysupardi/parkirpintar/pkg/idempotency"
 	"github.com/edysupardi/parkirpintar/pkg/lock"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/domain"
+	"github.com/edysupardi/parkirpintar/services/reservation/internal/handler"
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/repository"
 	"github.com/edysupardi/parkirpintar/services/reservation/internal/usecase"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
 )
 
 type VehicleType = domain.VehicleType
@@ -45,4 +48,10 @@ func NewUsecase(pool *pgxpool.Pool, rdb *redis.Client, log logger.Logger) *useca
 	locker := lock.New(rdb)
 	idem := idempotency.New(rdb)
 	return usecase.New(repo, locker, &NoopPublisher{}, idem, log)
+}
+
+// RegisterServer registers the reservation gRPC service on the given server.
+func RegisterServer(srv *grpc.Server, pool *pgxpool.Pool, rdb *redis.Client, log logger.Logger) {
+	uc := NewUsecase(pool, rdb, log)
+	reservationv1.RegisterReservationServiceServer(srv, handler.New(uc))
 }
