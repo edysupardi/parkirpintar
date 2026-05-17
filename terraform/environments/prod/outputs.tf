@@ -15,6 +15,6 @@ output "redis_endpoint" {
 }
 
 output "mq_amqp_endpoint" {
-  value     = module.mq.amqp_endpoint
+  value     = local.mq_endpoint
   sensitive = true
 }
