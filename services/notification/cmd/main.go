@@ -10,11 +10,13 @@ import (
 
 	notificationv1 "github.com/edysupardi/parkirpintar/gen/notification/v1"
 	"github.com/edysupardi/parkirpintar/pkg/config"
+	"github.com/edysupardi/parkirpintar/pkg/database"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
-	"github.com/edysupardi/parkirpintar/pkg/tracer"
 	"github.com/edysupardi/parkirpintar/pkg/mq"
+	"github.com/edysupardi/parkirpintar/pkg/tracer"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/handler"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/provider"
+	"github.com/edysupardi/parkirpintar/services/notification/internal/repository"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/subscriber"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -43,15 +45,33 @@ func main() {
 	push := provider.NewStubPush(log)
 	email := provider.NewStubEmail(log)
 
-	_ = cfg // cfg used when real FCM/SES providers are wired
+	// database for notification history
+	var repo *repository.Repository
+	db, dbErr := database.New(ctx, database.Config{
+		Host:         cfg.Database.Host,
+		Port:         cfg.Database.Port,
+		Name:         cfg.Database.Name,
+		User:         cfg.Database.User,
+		Password:     cfg.Database.Password,
+		SSLMode:      cfg.Database.SSLMode,
+		MaxOpenConns: cfg.Database.MaxOpenConns,
+		MaxIdleConns: cfg.Database.MaxIdleConns,
+	})
+	if dbErr != nil {
+		log.Warn(ctx).Err(dbErr).Msg("failed to connect to database, notification history disabled")
+	} else {
+		defer db.Close()
+		repo = repository.New(db.Pool())
+	}
 
 	// MQ consumer for all reservation events
+	notifHandler := handler.New(push, email, repo, log)
 	mqConsumer, err := mq.NewConsumer(cfg.RabbitMQ.URL)
 	if err != nil {
 		log.Warn(ctx).Err(err).Msg("failed to connect to RabbitMQ, notification subscriber disabled")
 	} else {
 		defer mqConsumer.Close()
-		sub := subscriber.New(push, log)
+		sub := subscriber.New(notifHandler, log)
 		if err := sub.Register(mqConsumer); err != nil {
 			log.Warn(ctx).Err(err).Msg("failed to register notification subscriber")
 		} else {
@@ -59,10 +79,10 @@ func main() {
 		}
 	}
 
-	
+
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.UnaryServerLogger(log)))
 
-	notificationv1.RegisterNotificationServiceServer(srv, handler.New(push, email, log))
+	notificationv1.RegisterNotificationServiceServer(srv, notifHandler)
 	grpc_health_v1.RegisterHealthServer(srv, health.NewServer())
 	reflection.Register(srv)
 

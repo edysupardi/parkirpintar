@@ -3,25 +3,37 @@ package handler
 import (
 	"context"
 	"fmt"
+	"time"
 
 	notificationv1 "github.com/edysupardi/parkirpintar/gen/notification/v1"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/domain"
+	"github.com/edysupardi/parkirpintar/services/notification/internal/repository"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+type NotificationRepo interface {
+	Insert(ctx context.Context, log repository.NotificationLog) error
+	GetByDriverID(ctx context.Context, driverID string, limit, offset int32) ([]repository.NotificationLog, int32, error)
+}
+
 type NotificationHandler struct {
 	notificationv1.UnimplementedNotificationServiceServer
 	push  domain.PushProvider
 	email domain.EmailProvider
+	repo  NotificationRepo
 	log   logger.Logger
 }
 
-func New(push domain.PushProvider, email domain.EmailProvider, log logger.Logger) *NotificationHandler {
-	return &NotificationHandler{push: push, email: email, log: log}
+func New(push domain.PushProvider, email domain.EmailProvider, repo *repository.Repository, log logger.Logger) *NotificationHandler {
+	return &NotificationHandler{push: push, email: email, repo: repo, log: log}
+}
+
+func NewWithRepo(push domain.PushProvider, email domain.EmailProvider, repo NotificationRepo, log logger.Logger) *NotificationHandler {
+	return &NotificationHandler{push: push, email: email, repo: repo, log: log}
 }
 
 func (h *NotificationHandler) SendNotification(ctx context.Context, req *notificationv1.SendNotificationRequest) (*notificationv1.SendNotificationResponse, error) {
@@ -41,11 +53,33 @@ func (h *NotificationHandler) SendNotification(ctx context.Context, req *notific
 		sendErr = h.email.Send(ctx, req.DriverId, title, body)
 	}
 
+	logEntry := repository.NotificationLog{
+		ID:         notifID,
+		DriverID:   req.DriverId,
+		Channel:    req.Channel.String(),
+		TemplateID: req.TemplateId.String(),
+		Title:      title,
+		Body:       body,
+		Status:     "sent",
+		SentAt:     time.Now(),
+	}
+
+	if sendErr != nil {
+		logEntry.Status = "failed"
+		logEntry.ErrorMessage = sendErr.Error()
+	}
+
+	if h.repo != nil {
+		if err := h.repo.Insert(ctx, logEntry); err != nil {
+			h.log.Warn(ctx).Err(err).Msg("failed to persist notification log")
+		}
+	}
+
 	if sendErr != nil {
 		return &notificationv1.SendNotificationResponse{
-			Success:      false,
+			Success:        false,
 			NotificationId: notifID,
-			ErrorMessage: sendErr.Error(),
+			ErrorMessage:   sendErr.Error(),
 		}, nil
 	}
 
@@ -76,7 +110,60 @@ func (h *NotificationHandler) BroadcastNotification(ctx context.Context, req *no
 }
 
 func (h *NotificationHandler) GetNotificationHistory(ctx context.Context, req *notificationv1.GetNotificationHistoryRequest) (*notificationv1.GetNotificationHistoryResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "history not persisted in stub mode")
+	if req.DriverId == "" {
+		return nil, status.Error(codes.InvalidArgument, "driver_id is required")
+	}
+	if h.repo == nil {
+		return nil, status.Error(codes.Unavailable, "notification history not available")
+	}
+
+	logs, total, err := h.repo.GetByDriverID(ctx, req.DriverId, req.Limit, req.Offset)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("query history: %v", err))
+	}
+
+	records := make([]*notificationv1.NotificationRecord, 0, len(logs))
+	for _, l := range logs {
+		records = append(records, &notificationv1.NotificationRecord{
+			NotificationId: l.ID,
+			DriverId:       l.DriverID,
+			Channel:        channelFromString(l.Channel),
+			TemplateId:     templateFromString(l.TemplateID),
+			Status:         statusFromString(l.Status),
+			ErrorMessage:   l.ErrorMessage,
+			SentAt:         timestamppb.New(l.SentAt),
+		})
+	}
+
+	return &notificationv1.GetNotificationHistoryResponse{
+		Records: records,
+		Total:   total,
+	}, nil
+}
+
+func channelFromString(s string) notificationv1.NotificationChannel {
+	if v, ok := notificationv1.NotificationChannel_value[s]; ok {
+		return notificationv1.NotificationChannel(v)
+	}
+	return notificationv1.NotificationChannel_NOTIFICATION_CHANNEL_UNSPECIFIED
+}
+
+func templateFromString(s string) notificationv1.TemplateID {
+	if v, ok := notificationv1.TemplateID_value[s]; ok {
+		return notificationv1.TemplateID(v)
+	}
+	return notificationv1.TemplateID_TEMPLATE_ID_UNSPECIFIED
+}
+
+func statusFromString(s string) notificationv1.NotificationStatus {
+	switch s {
+	case "sent":
+		return notificationv1.NotificationStatus_NOTIFICATION_STATUS_SENT
+	case "failed":
+		return notificationv1.NotificationStatus_NOTIFICATION_STATUS_FAILED
+	default:
+		return notificationv1.NotificationStatus_NOTIFICATION_STATUS_UNSPECIFIED
+	}
 }
 
 func templateContent(tmpl notificationv1.TemplateID, data map[string]string) (title, body string) {
@@ -101,6 +188,3 @@ func templateContent(tmpl notificationv1.TemplateID, data map[string]string) (ti
 		return "Notifikasi ParkirPintar", data["message"]
 	}
 }
-
-// ensure timestamppb is used (for future history implementation)
-var _ = timestamppb.Now

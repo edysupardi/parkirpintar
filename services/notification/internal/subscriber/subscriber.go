@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	notificationv1 "github.com/edysupardi/parkirpintar/gen/notification/v1"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
 	"github.com/edysupardi/parkirpintar/pkg/mq"
 )
@@ -19,17 +20,17 @@ type reservationEvent struct {
 	Status        string `json:"status"`
 }
 
-type PushProvider interface {
-	Send(ctx context.Context, driverID, title, body string, data map[string]string) error
+type NotificationSender interface {
+	SendNotification(ctx context.Context, req *notificationv1.SendNotificationRequest) (*notificationv1.SendNotificationResponse, error)
 }
 
 type NotificationSubscriber struct {
-	push PushProvider
-	log  logger.Logger
+	sender NotificationSender
+	log    logger.Logger
 }
 
-func New(push PushProvider, log logger.Logger) *NotificationSubscriber {
-	return &NotificationSubscriber{push: push, log: log}
+func New(sender NotificationSender, log logger.Logger) *NotificationSubscriber {
+	return &NotificationSubscriber{sender: sender, log: log}
 }
 
 func (s *NotificationSubscriber) Register(consumer *mq.Consumer) error {
@@ -52,40 +53,50 @@ func (s *NotificationSubscriber) Handle(ctx context.Context, msg mq.Message) err
 		return fmt.Errorf("unmarshal notification event: %w", err)
 	}
 
-	title, body := s.buildContent(msg.Event, evt)
-	if err := s.push.Send(ctx, evt.DriverID, title, body, map[string]string{
-		"event":          msg.Event,
-		"reservation_id": evt.ReservationID,
-	}); err != nil {
-		s.log.Warn(ctx).Err(err).Str("event", msg.Event).Msg("failed to send push notification")
+	templateID := eventToTemplate(msg.Event)
+
+	resp, err := s.sender.SendNotification(ctx, &notificationv1.SendNotificationRequest{
+		DriverId:   evt.DriverID,
+		Channel:    notificationv1.NotificationChannel_NOTIFICATION_CHANNEL_PUSH,
+		TemplateId: templateID,
+		Data: map[string]string{
+			"event":          msg.Event,
+			"reservation_id": evt.ReservationID,
+			"spot":           fmt.Sprintf("%d", evt.SpotNumber),
+			"floor":          fmt.Sprintf("%d", evt.Floor),
+		},
+	})
+	if err != nil {
+		s.log.Error(ctx).Err(err).Str("event", msg.Event).Msg("failed to send notification via handler")
+		return err
 	}
 
-	s.log.Info(ctx).
-		Str("event", msg.Event).
-		Str("driver_id", evt.DriverID).
-		Str("reservation_id", evt.ReservationID).
-		Msg("notification sent")
+	if !resp.Success {
+		s.log.Warn(ctx).Str("event", msg.Event).Str("error", resp.ErrorMessage).Msg("notification send failed")
+	} else {
+		s.log.Info(ctx).
+			Str("event", msg.Event).
+			Str("driver_id", evt.DriverID).
+			Str("notification_id", resp.NotificationId).
+			Msg("notification sent and persisted")
+	}
 
 	return nil
 }
 
-func (s *NotificationSubscriber) BuildContent(event string, evt reservationEvent) (title, body string) {
-	return s.buildContent(event, evt)
-}
-
-func (s *NotificationSubscriber) buildContent(event string, evt reservationEvent) (title, body string) {
+func eventToTemplate(event string) notificationv1.TemplateID {
 	switch event {
 	case mq.EventReservationConfirmed:
-		return "Reservasi Dikonfirmasi", fmt.Sprintf("Spot lantai %d nomor %d sudah dipesan. Silakan check-in dalam 1 jam.", evt.Floor, evt.SpotNumber)
+		return notificationv1.TemplateID_TEMPLATE_ID_RESERVATION_CONFIRMED
 	case mq.EventReservationExpired:
-		return "Reservasi Kadaluarsa", "Reservasi Anda telah kadaluarsa karena tidak check-in dalam 1 jam."
+		return notificationv1.TemplateID_TEMPLATE_ID_RESERVATION_EXPIRED
 	case mq.EventReservationCancelled:
-		return "Reservasi Dibatalkan", "Reservasi Anda telah dibatalkan."
+		return notificationv1.TemplateID_TEMPLATE_ID_RESERVATION_CANCELLED
 	case mq.EventCheckInDetected:
-		return "Check-in Berhasil", fmt.Sprintf("Selamat datang! Anda sudah check-in di spot lantai %d nomor %d.", evt.Floor, evt.SpotNumber)
+		return notificationv1.TemplateID_TEMPLATE_ID_CHECK_IN_SUCCESS
 	case mq.EventCheckOutCompleted:
-		return "Check-out Berhasil", "Terima kasih telah menggunakan ParkirPintar. Invoice sedang diproses."
+		return notificationv1.TemplateID_TEMPLATE_ID_CHECK_OUT_SUCCESS
 	default:
-		return "Notifikasi ParkirPintar", event
+		return notificationv1.TemplateID_TEMPLATE_ID_UNSPECIFIED
 	}
 }

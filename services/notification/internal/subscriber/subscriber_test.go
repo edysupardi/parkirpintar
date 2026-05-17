@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	notificationv1 "github.com/edysupardi/parkirpintar/gen/notification/v1"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
 	"github.com/edysupardi/parkirpintar/pkg/mq"
 	"github.com/edysupardi/parkirpintar/services/notification/internal/subscriber"
@@ -14,16 +15,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockPush struct {
-	called   bool
-	lastTitle string
-	err      error
+type mockSender struct {
+	called    bool
+	lastReq   *notificationv1.SendNotificationRequest
+	resp      *notificationv1.SendNotificationResponse
+	err       error
 }
 
-func (m *mockPush) Send(_ context.Context, _, title, _ string, _ map[string]string) error {
+func (m *mockSender) SendNotification(_ context.Context, req *notificationv1.SendNotificationRequest) (*notificationv1.SendNotificationResponse, error) {
 	m.called = true
-	m.lastTitle = title
-	return m.err
+	m.lastReq = req
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.resp != nil {
+		return m.resp, nil
+	}
+	return &notificationv1.SendNotificationResponse{Success: true, NotificationId: "notif-001"}, nil
 }
 
 func newMsg(t *testing.T, event string, payload any) mq.Message {
@@ -35,21 +43,21 @@ func newMsg(t *testing.T, event string, payload any) mq.Message {
 
 func TestNotificationSubscriber_Handle_AllEvents(t *testing.T) {
 	cases := []struct {
-		event         string
-		expectedTitle string
+		event      string
+		templateID notificationv1.TemplateID
 	}{
-		{mq.EventReservationConfirmed, "Reservasi Dikonfirmasi"},
-		{mq.EventReservationExpired, "Reservasi Kadaluarsa"},
-		{mq.EventReservationCancelled, "Reservasi Dibatalkan"},
-		{mq.EventCheckInDetected, "Check-in Berhasil"},
-		{mq.EventCheckOutCompleted, "Check-out Berhasil"},
+		{mq.EventReservationConfirmed, notificationv1.TemplateID_TEMPLATE_ID_RESERVATION_CONFIRMED},
+		{mq.EventReservationExpired, notificationv1.TemplateID_TEMPLATE_ID_RESERVATION_EXPIRED},
+		{mq.EventReservationCancelled, notificationv1.TemplateID_TEMPLATE_ID_RESERVATION_CANCELLED},
+		{mq.EventCheckInDetected, notificationv1.TemplateID_TEMPLATE_ID_CHECK_IN_SUCCESS},
+		{mq.EventCheckOutCompleted, notificationv1.TemplateID_TEMPLATE_ID_CHECK_OUT_SUCCESS},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.event, func(t *testing.T) {
-			push := &mockPush{}
+			sender := &mockSender{}
 			log := logger.New(logger.Config{Service: "test", Level: "error"})
-			sub := subscriber.New(push, log)
+			sub := subscriber.New(sender, log)
 
 			msg := newMsg(t, tc.event, map[string]any{
 				"reservation_id": "res-001",
@@ -57,20 +65,21 @@ func TestNotificationSubscriber_Handle_AllEvents(t *testing.T) {
 				"floor":          1,
 				"spot_number":    5,
 			})
-			msg.Event = tc.event
 
 			err := sub.Handle(context.Background(), msg)
 			require.NoError(t, err)
-			assert.True(t, push.called)
-			assert.Equal(t, tc.expectedTitle, push.lastTitle)
+			assert.True(t, sender.called)
+			assert.Equal(t, "drv-001", sender.lastReq.DriverId)
+			assert.Equal(t, tc.templateID, sender.lastReq.TemplateId)
+			assert.Equal(t, notificationv1.NotificationChannel_NOTIFICATION_CHANNEL_PUSH, sender.lastReq.Channel)
 		})
 	}
 }
 
 func TestNotificationSubscriber_Handle_InvalidPayload(t *testing.T) {
-	push := &mockPush{}
+	sender := &mockSender{}
 	log := logger.New(logger.Config{Service: "test", Level: "error"})
-	sub := subscriber.New(push, log)
+	sub := subscriber.New(sender, log)
 
 	msg := mq.Message{
 		Event:     mq.EventReservationConfirmed,
@@ -80,38 +89,39 @@ func TestNotificationSubscriber_Handle_InvalidPayload(t *testing.T) {
 
 	err := sub.Handle(context.Background(), msg)
 	require.Error(t, err)
-	assert.False(t, push.called)
+	assert.False(t, sender.called)
 }
 
-func TestNotificationSubscriber_Handle_PushError_DoesNotFail(t *testing.T) {
-	push := &mockPush{err: errors.New("fcm error")}
+func TestNotificationSubscriber_Handle_SenderError(t *testing.T) {
+	sender := &mockSender{err: errors.New("handler error")}
 	log := logger.New(logger.Config{Service: "test", Level: "error"})
-	sub := subscriber.New(push, log)
+	sub := subscriber.New(sender, log)
 
 	msg := newMsg(t, mq.EventReservationConfirmed, map[string]any{
 		"reservation_id": "res-001",
 		"driver_id":      "drv-001",
 	})
-	msg.Event = mq.EventReservationConfirmed
 
-	// push error should not propagate — notification is best-effort
 	err := sub.Handle(context.Background(), msg)
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "handler error")
 }
 
-func TestNotificationSubscriber_Handle_UnknownEvent(t *testing.T) {
-	push := &mockPush{}
+func TestNotificationSubscriber_Handle_SendFailed_NoError(t *testing.T) {
+	sender := &mockSender{
+		resp: &notificationv1.SendNotificationResponse{Success: false, ErrorMessage: "fcm down"},
+	}
 	log := logger.New(logger.Config{Service: "test", Level: "error"})
-	sub := subscriber.New(push, log)
+	sub := subscriber.New(sender, log)
 
-	msg := newMsg(t, "unknown.event", map[string]any{
+	msg := newMsg(t, mq.EventCheckInDetected, map[string]any{
 		"reservation_id": "res-001",
 		"driver_id":      "drv-001",
+		"floor":          2,
+		"spot_number":    10,
 	})
-	msg.Event = "unknown.event"
 
+	// send failure is logged but not returned as error (best-effort)
 	err := sub.Handle(context.Background(), msg)
 	require.NoError(t, err)
-	assert.True(t, push.called)
-	assert.Equal(t, "Notifikasi ParkirPintar", push.lastTitle)
 }
