@@ -15,7 +15,8 @@ variable "environment" {
 
 variable "certificate_arn" {
   type        = string
-  description = "ACM certificate ARN for HTTPS"
+  description = "ACM certificate ARN for HTTPS (optional, HTTP-only if empty)"
+  default     = ""
 }
 
 variable "db_password" {

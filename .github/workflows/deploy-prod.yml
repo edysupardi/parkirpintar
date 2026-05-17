@@ -71,8 +71,12 @@ jobs:
       - name: Check if service changed
         id: should-deploy
         run: |
-          changed="${{ needs.detect-changes.outputs[matrix.service] }}"
-          echo "changed=$changed" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            changed="${{ needs.detect-changes.outputs[matrix.service] }}"
+            echo "changed=$changed" >> $GITHUB_OUTPUT
+          fi
 
       - name: Configure AWS credentials
         if: steps.should-deploy.outputs.changed == 'true'

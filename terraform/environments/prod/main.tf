@@ -29,18 +29,31 @@ provider "aws" {
 }
 
 locals {
-  services = ["gateway", "reservation", "billing", "payment", "presence", "notification"]
-  ecr_base = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+  services    = ["gateway", "reservation", "billing", "payment", "presence", "notification"]
+  ecr_base    = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+  mq_endpoint = "amqp://${var.project_name}:${var.mq_password}@rabbitmq.${var.project_name}-${var.environment}-mq.local:5672/"
 }
 
 data "aws_caller_identity" "current" {}
+
+data "aws_secretsmanager_secret" "jwt" {
+  name = "${var.project_name}/prod/jwt-secret"
+}
+
+data "aws_secretsmanager_secret" "db_password" {
+  name = "${var.project_name}/prod/db-password"
+}
+
+data "aws_secretsmanager_secret" "midtrans" {
+  name = "${var.project_name}/prod/midtrans-server-key"
+}
 
 module "networking" {
   source             = "../../modules/networking"
   project_name       = var.project_name
   environment        = var.environment
   vpc_cidr           = "10.1.0.0/16"
-  single_nat_gateway = false
+  single_nat_gateway = true
 }
 
 module "load_balancer" {
@@ -62,8 +75,8 @@ module "rds" {
   private_subnet_ids   = module.networking.private_subnet_ids
   db_security_group_id = module.networking.rds_security_group_id
   db_password          = var.db_password
-  min_capacity         = 1
-  max_capacity         = 16
+  min_capacity         = 0.5
+  max_capacity         = 4
 }
 
 module "elasticache" {
@@ -76,13 +89,15 @@ module "elasticache" {
 }
 
 module "mq" {
-  source               = "../../modules/mq"
-  project_name         = var.project_name
-  environment          = var.environment
-  vpc_id               = module.networking.vpc_id
-  private_subnet_ids   = module.networking.private_subnet_ids
-  mq_security_group_id = module.networking.mq_security_group_id
-  mq_password          = var.mq_password
+  source                 = "../../modules/mq"
+  project_name           = var.project_name
+  environment            = var.environment
+  vpc_id                 = module.networking.vpc_id
+  private_subnet_ids     = module.networking.private_subnet_ids
+  mq_security_group_id   = module.networking.mq_security_group_id
+  mq_password            = var.mq_password
+  ecs_cluster_id         = module.ecs.cluster_id
+  ecs_execution_role_arn = module.ecs.execution_role_arn
 }
 
 module "ecs" {
@@ -100,84 +115,111 @@ module "ecs" {
   services = {
     gateway = {
       image         = "${local.ecr_base}/${var.project_name}-gateway:latest"
-      cpu           = 512
-      memory        = 1024
+      cpu           = 256
+      memory        = 512
       port          = 8080
-      desired_count = 2
+      desired_count = 1
       grpc          = false
       environment = [
         { name = "ENV", value = "prod" },
-        { name = "GRPC_RESERVATION_ADDR", value = "${var.project_name}-prod-reservation:9090" },
-        { name = "GRPC_BILLING_ADDR", value = "${var.project_name}-prod-billing:9090" },
-        { name = "GRPC_PRESENCE_ADDR", value = "${var.project_name}-prod-presence:9090" },
+        { name = "DB_HOST", value = module.rds.cluster_endpoint },
+        { name = "DB_USER", value = "parkirpintar" },
+        { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
+        { name = "REDIS_TLS", value = "true" },
+        { name = "RESERVATION_HOST", value = module.load_balancer.nlb_dns_name },
+        { name = "RESERVATION_GRPC_PORT", value = "9091" },
+        { name = "BILLING_HOST", value = module.load_balancer.nlb_dns_name },
+        { name = "BILLING_GRPC_PORT", value = "9092" },
+        { name = "PAYMENT_HOST", value = module.load_balancer.nlb_dns_name },
+        { name = "PAYMENT_GRPC_PORT", value = "9093" },
+        { name = "PRESENCE_HOST", value = module.load_balancer.nlb_dns_name },
+        { name = "PRESENCE_GRPC_PORT", value = "9094" },
       ]
       secrets = [
-        { name = "JWT_SECRET", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/prod/jwt-secret" }
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn },
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn }
       ]
     }
     reservation = {
       image         = "${local.ecr_base}/${var.project_name}-reservation:latest"
-      cpu           = 512
-      memory        = 1024
+      cpu           = 256
+      memory        = 512
       port          = 9090
-      desired_count = 2
+      desired_count = 1
       grpc          = true
       environment = [
         { name = "ENV", value = "prod" },
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
+        { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
-        { name = "MQ_URL", value = module.mq.amqp_endpoint },
+        { name = "REDIS_TLS", value = "true" },
+        { name = "MQ_URL", value = local.mq_endpoint },
+        { name = "RESERVATION_GRPC_PORT", value = "9090" },
       ]
       secrets = [
-        { name = "DB_PASSWORD", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/prod/db-password" }
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn },
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn }
       ]
     }
     billing = {
       image         = "${local.ecr_base}/${var.project_name}-billing:latest"
-      cpu           = 512
-      memory        = 1024
+      cpu           = 256
+      memory        = 512
       port          = 9090
-      desired_count = 2
+      desired_count = 1
       grpc          = true
       environment = [
         { name = "ENV", value = "prod" },
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
+        { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
+        { name = "REDIS_TLS", value = "true" },
+        { name = "BILLING_GRPC_PORT", value = "9090" },
       ]
       secrets = [
-        { name = "DB_PASSWORD", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/prod/db-password" }
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn },
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn }
       ]
     }
     payment = {
       image         = "${local.ecr_base}/${var.project_name}-payment:latest"
-      cpu           = 512
-      memory        = 1024
+      cpu           = 256
+      memory        = 512
       port          = 9090
-      desired_count = 2
+      desired_count = 1
       grpc          = true
       environment = [
         { name = "ENV", value = "prod" },
         { name = "DB_HOST", value = module.rds.cluster_endpoint },
+        { name = "DB_USER", value = "parkirpintar" },
         { name = "REDIS_ADDR", value = "${module.elasticache.endpoint}:${module.elasticache.port}" },
+        { name = "REDIS_TLS", value = "true" },
         { name = "PAYMENT_PROVIDER", value = "midtrans" },
+        { name = "MIDTRANS_CLIENT_KEY", value = "SB-Mid-client-CteqXD_Bh8T3RYeg" },
+        { name = "PAYMENT_GRPC_PORT", value = "9090" },
       ]
       secrets = [
-        { name = "DB_PASSWORD", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/prod/db-password" },
-        { name = "MIDTRANS_SERVER_KEY", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/prod/midtrans-server-key" }
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn },
+        { name = "MIDTRANS_SERVER_KEY", valueFrom = data.aws_secretsmanager_secret.midtrans.arn },
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn }
       ]
     }
     presence = {
       image         = "${local.ecr_base}/${var.project_name}-presence:latest"
-      cpu           = 512
-      memory        = 1024
+      cpu           = 256
+      memory        = 512
       port          = 9090
-      desired_count = 2
+      desired_count = 1
       grpc          = true
       environment = [
         { name = "ENV", value = "prod" },
-        { name = "MQ_URL", value = module.mq.amqp_endpoint },
+        { name = "MQ_URL", value = local.mq_endpoint },
+        { name = "PRESENCE_GRPC_PORT", value = "9090" },
       ]
-      secrets = []
+      secrets = [
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn },
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn }
+      ]
     }
     notification = {
       image         = "${local.ecr_base}/${var.project_name}-notification:latest"
@@ -188,11 +230,13 @@ module "ecs" {
       grpc          = true
       environment = [
         { name = "ENV", value = "prod" },
-        { name = "MQ_URL", value = module.mq.amqp_endpoint },
-        { name = "NOTIFICATION_PROVIDER", value = "all" },
+        { name = "MQ_URL", value = local.mq_endpoint },
+        { name = "NOTIFICATION_PROVIDER", value = "stub" },
+        { name = "NOTIFICATION_GRPC_PORT", value = "9090" },
       ]
       secrets = [
-        { name = "FCM_CREDENTIALS", valueFrom = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/prod/fcm-credentials" }
+        { name = "JWT_SECRET", valueFrom = data.aws_secretsmanager_secret.jwt.arn },
+        { name = "DB_PASSWORD", valueFrom = data.aws_secretsmanager_secret.db_password.arn }
       ]
     }
   }
