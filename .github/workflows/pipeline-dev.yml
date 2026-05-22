@@ -1,6 +1,7 @@
 name: Pipeline Dev
 
 on:
+  workflow_dispatch:
   push:
     branches: [develop]
     paths:
