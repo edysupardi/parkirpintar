@@ -1,13 +1,16 @@
 package billing
 
 import (
+	billingv1 "github.com/edysupardi/parkirpintar/gen/billing/v1"
 	"github.com/edysupardi/parkirpintar/pkg/idempotency"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
 	"github.com/edysupardi/parkirpintar/services/billing/internal/domain"
+	"github.com/edysupardi/parkirpintar/services/billing/internal/handler"
 	"github.com/edysupardi/parkirpintar/services/billing/internal/repository"
 	"github.com/edysupardi/parkirpintar/services/billing/internal/usecase"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
 )
 
 type InvoiceStatus = domain.InvoiceStatus
@@ -27,4 +30,9 @@ func NewUsecase(pool *pgxpool.Pool, rdb *redis.Client, log logger.Logger) *useca
 	repo := repository.New(pool)
 	idem := idempotency.New(rdb)
 	return usecase.New(repo, idem, log)
+}
+
+func RegisterServer(srv *grpc.Server, pool *pgxpool.Pool, rdb *redis.Client, log logger.Logger) {
+	uc := NewUsecase(pool, rdb, log)
+	billingv1.RegisterBillingServiceServer(srv, handler.New(uc))
 }
