@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"time"
 
+	paymentv1 "github.com/edysupardi/parkirpintar/gen/payment/v1"
 	"github.com/edysupardi/parkirpintar/pkg/idempotency"
 	"github.com/edysupardi/parkirpintar/pkg/logger"
 	"github.com/edysupardi/parkirpintar/services/payment/internal/domain"
+	"github.com/edysupardi/parkirpintar/services/payment/internal/handler"
 	"github.com/edysupardi/parkirpintar/services/payment/internal/repository"
 	"github.com/edysupardi/parkirpintar/services/payment/internal/usecase"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
 )
 
 type TransactionStatus = domain.TransactionStatus
@@ -56,4 +59,9 @@ func NewUsecase(pool *pgxpool.Pool, rdb *redis.Client, gw domain.PaymentGateway,
 	repo := repository.New(pool)
 	idem := idempotency.New(rdb)
 	return usecase.New(repo, gw, idem, serverKey, log)
+}
+
+func RegisterServer(srv *grpc.Server, pool *pgxpool.Pool, rdb *redis.Client, gw domain.PaymentGateway, serverKey string, log logger.Logger) {
+	uc := NewUsecase(pool, rdb, gw, serverKey, log)
+	paymentv1.RegisterPaymentServiceServer(srv, handler.New(uc))
 }
