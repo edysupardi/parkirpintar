@@ -42,13 +42,14 @@ func TestIsOvernight_SameDay(t *testing.T) {
 }
 
 func TestCalculate_NormalSession(t *testing.T) {
-	checkIn  := time.Now()
+	wib      := time.FixedZone("WIB", 7*3600)
+	checkIn  := time.Date(2026, 5, 22, 10, 0, 0, 0, wib)
 	checkOut := checkIn.Add(2 * time.Hour)
 	result   := pricing.Calculate(checkIn, checkOut)
 	assert.Equal(t, int64(10_000), result.ParkingFee)
 	assert.Equal(t, int64(5_000),  result.BookingFee)
 	assert.Equal(t, int64(0),      result.OvernightFee)
-	assert.Equal(t, int64(10_000), result.TotalAmount) // parking only, booking fee charged at reserve
+	assert.Equal(t, int64(10_000), result.TotalAmount)
 }
 
 func TestCalculateCancellationFee_Under2Min(t *testing.T) {
