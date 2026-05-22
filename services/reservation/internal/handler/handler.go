@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"strings"
 
 	commonv1 "github.com/edysupardi/parkirpintar/gen/common/v1"
 	reservationv1 "github.com/edysupardi/parkirpintar/gen/reservation/v1"
@@ -213,6 +214,15 @@ func domainReservationToProto(r *domain.Reservation) *reservationv1.Reservation 
 
 func toGRPCError(err error) error {
 	msg := err.Error()
+
+	if strings.Contains(msg, "no rows in result set") || strings.Contains(msg, "not found") {
+		return status.Error(codes.NotFound, msg)
+	}
+	if strings.Contains(msg, "cannot be cancelled") || strings.Contains(msg, "cannot confirm") ||
+		strings.Contains(msg, "cannot check in") || strings.Contains(msg, "cannot check out") {
+		return status.Error(codes.FailedPrecondition, msg)
+	}
+
 	switch msg {
 	case "spot unavailable", "no available spot":
 		return status.Error(codes.ResourceExhausted, msg)

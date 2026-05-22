@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/edysupardi/parkirpintar/services/billing/internal/domain"
@@ -36,6 +37,9 @@ func (r *PostgresRepository) InsertInvoice(ctx context.Context, inv domain.Invoi
 		string(inv.Status), inv.IdempotencyKey,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "23505") {
+			return fmt.Errorf("request already processed")
+		}
 		return fmt.Errorf("insert invoice: %w", err)
 	}
 	return nil

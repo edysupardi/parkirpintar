@@ -1,0 +1,261 @@
+name: Pipeline Dev
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - 'services/**'
+      - 'pkg/**'
+      - 'gen/**'
+
+env:
+  AWS_REGION:   ap-southeast-1
+  PROJECT_NAME: edysup-parkirpintar
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com
+  ENVIRONMENT:  dev
+
+jobs:
+  # ─── Stage 1: Code Quality ─────────────────────────────────────────────────
+  lint:
+    name: "Stage 1 · Code Quality"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - name: Run golangci-lint
+        run: golangci-lint run --timeout=5m
+
+  # ─── Stage 2a: Unit Tests (BLOCKER) ────────────────────────────────────────
+  unit-test:
+    name: "Stage 2a · Unit Tests"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: Run unit tests
+        run: go test ./pkg/... ./services/billing/internal/... ./services/notification/internal/... ./services/reservation/internal/... ./services/payment/internal/... -race -timeout=60s -coverprofile=coverage.out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
+  # ─── Stage 2b: Integration Tests (non-blocker) ─────────────────────────────
+  integration-test:
+    name: "Stage 2b · Integration Tests"
+    runs-on: ubuntu-latest
+    needs: lint
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: Run integration tests
+        run: go test -tags integration ./tests/integration/... -v -timeout 120s
+
+  # ─── Stage 2c: E2E Tests (non-blocker) ─────────────────────────────────────
+  e2e-test:
+    name: "Stage 2c · E2E Tests"
+    runs-on: ubuntu-latest
+    needs: lint
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: Run E2E tests
+        run: go test -tags e2e ./tests/e2e/... -v -timeout 180s
+
+  # ─── Paths Filter ──────────────────────────────────────────────────────────
+  detect-changes:
+    name: "Detect Changes"
+    runs-on: ubuntu-latest
+    outputs:
+      gateway:      ${{ steps.changes.outputs.gateway }}
+      reservation:  ${{ steps.changes.outputs.reservation }}
+      billing:      ${{ steps.changes.outputs.billing }}
+      payment:      ${{ steps.changes.outputs.payment }}
+      presence:     ${{ steps.changes.outputs.presence }}
+      notification: ${{ steps.changes.outputs.notification }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            gateway:
+              - 'services/gateway/**'
+              - 'pkg/**'
+              - 'gen/**'
+            reservation:
+              - 'services/reservation/**'
+              - 'pkg/**'
+              - 'gen/**'
+            billing:
+              - 'services/billing/**'
+              - 'pkg/**'
+              - 'gen/**'
+            payment:
+              - 'services/payment/**'
+              - 'pkg/**'
+              - 'gen/**'
+            presence:
+              - 'services/presence/**'
+              - 'pkg/**'
+              - 'gen/**'
+            notification:
+              - 'services/notification/**'
+              - 'pkg/**'
+              - 'gen/**'
+
+  # ─── Stage 3: Infra Check (soft fail) ──────────────────────────────────────
+  infra-check:
+    name: "Stage 3 · Infra Check"
+    runs-on: ubuntu-latest
+    needs: unit-test
+    continue-on-error: true
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      infra-ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check ECS cluster exists
+        id: check
+        run: |
+          CLUSTER="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-cluster"
+          STATUS=$(aws ecs describe-clusters --clusters "$CLUSTER" --region ${{ env.AWS_REGION }} --query 'clusters[0].status' --output text 2>/dev/null || echo "NOT_FOUND")
+          if [ "$STATUS" = "ACTIVE" ]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+            echo "✅ Cluster $CLUSTER is ACTIVE"
+          else
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Cluster $CLUSTER not found or inactive (status: $STATUS)"
+            echo "⚠️ Build & Deploy stages will be skipped"
+          fi
+
+  # ─── Stage 4: Build & Push ──────────────────────────────────────────────────
+  build-push:
+    name: "Stage 4 · Build & Push ${{ matrix.service }}"
+    runs-on: ubuntu-latest
+    needs: [infra-check, detect-changes]
+    if: needs.infra-check.outputs.infra-ready == 'true'
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        service: [gateway, reservation, billing, payment, presence, notification]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if service changed
+        id: should-build
+        run: |
+          changed="${{ needs.detect-changes.outputs[matrix.service] }}"
+          echo "changed=$changed" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        if: steps.should-build.outputs.changed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        if: steps.should-build.outputs.changed == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        if: steps.should-build.outputs.changed == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        if: steps.should-build.outputs.changed == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.PROJECT_NAME }}-${{ matrix.service }}:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ env.PROJECT_NAME }}-${{ matrix.service }}:${{ env.ENVIRONMENT }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─── Stage 5: Deploy ────────────────────────────────────────────────────────
+  deploy:
+    name: "Stage 5 · Deploy ${{ matrix.service }}"
+    runs-on: ubuntu-latest
+    needs: [build-push, detect-changes, infra-check]
+    if: needs.infra-check.outputs.infra-ready == 'true'
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        service: [gateway, reservation, billing, payment, presence, notification]
+    steps:
+      - name: Check if service changed
+        id: should-deploy
+        run: |
+          changed="${{ needs.detect-changes.outputs[matrix.service] }}"
+          echo "changed=$changed" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        if: steps.should-deploy.outputs.changed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to ECS
+        if: steps.should-deploy.outputs.changed == 'true'
+        run: |
+          IMAGE="${{ env.ECR_REGISTRY }}/${{ env.PROJECT_NAME }}-${{ matrix.service }}:${{ github.sha }}"
+
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-${{ matrix.service }} \
+            --query 'taskDefinition' --output json)
+
+          NEW_TASK_DEF=$(echo $TASK_DEF | jq \
+            --arg IMAGE "$IMAGE" \
+            '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)')
+
+          NEW_TASK_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+
+          aws ecs update-service \
+            --cluster ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-cluster \
+            --service ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-${{ matrix.service }} \
+            --task-definition $NEW_TASK_ARN \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for stable deployment
+        if: steps.should-deploy.outputs.changed == 'true'
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-cluster \
+            --services ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-${{ matrix.service }} \
+            --region ${{ env.AWS_REGION }}
+          echo "✅ Deployed ${{ matrix.service }} to ${{ env.ENVIRONMENT }}"
