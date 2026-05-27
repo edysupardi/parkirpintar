@@ -60,7 +60,7 @@ resource "aws_ecs_task_definition" "rabbitmq" {
         logDriver = "awslogs"
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.rabbitmq.name
-          "awslogs-region"        = "ap-southeast-1"
+          "awslogs-region"        = var.aws_region
           "awslogs-stream-prefix" = "rabbitmq"
         }
       }

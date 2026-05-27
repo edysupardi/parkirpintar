@@ -10,7 +10,7 @@ on:
       - 'gen/**'
 
 env:
-  AWS_REGION:   ap-southeast-1
+  AWS_REGION:   ap-southeast-3
   PROJECT_NAME: edysup-parkirpintar
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com
   ENVIRONMENT:  prod

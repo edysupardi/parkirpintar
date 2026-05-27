@@ -35,3 +35,7 @@ variable "ecs_cluster_id" {
 variable "ecs_execution_role_arn" {
   type = string
 }
+
+variable "aws_region" {
+  type = string
+}

@@ -1,6 +1,5 @@
 locals {
   name        = "${var.project_name}-${var.environment}"
-  nat_count   = var.single_nat_gateway ? 1 : length(var.availability_zones)
   common_tags = {
     Project     = var.project_name
     Environment = var.environment
@@ -37,19 +36,6 @@ resource "aws_internet_gateway" "main" {
   tags   = merge(local.common_tags, { Name = "${local.name}-igw" })
 }
 
-resource "aws_eip" "nat" {
-  count  = local.nat_count
-  domain = "vpc"
-  tags   = merge(local.common_tags, { Name = "${local.name}-nat-eip-${count.index + 1}" })
-}
-
-resource "aws_nat_gateway" "main" {
-  count         = local.nat_count
-  allocation_id = aws_eip.nat[count.index].id
-  subnet_id     = aws_subnet.public[count.index].id
-  depends_on    = [aws_internet_gateway.main]
-  tags          = merge(local.common_tags, { Name = "${local.name}-nat-${count.index + 1}" })
-}
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
@@ -66,15 +52,11 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Private route tables — one per AZ, but NAT gateway index is capped for single-NAT mode
+# Private route tables — no internet route (RDS/Redis/MQ don't need outbound)
 resource "aws_route_table" "private" {
   count  = length(var.availability_zones)
   vpc_id = aws_vpc.main.id
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main[min(count.index, local.nat_count - 1)].id
-  }
-  tags = merge(local.common_tags, { Name = "${local.name}-private-rt-${count.index + 1}" })
+  tags   = merge(local.common_tags, { Name = "${local.name}-private-rt-${count.index + 1}" })
 }
 
 resource "aws_route_table_association" "private" {

@@ -10,7 +10,7 @@ terraform {
   backend "s3" {
     bucket         = "edysup-parkirpintar-terraform-state"
     key            = "dev/terraform.tfstate"
-    region         = "ap-southeast-1"
+    region         = "ap-southeast-3"
     dynamodb_table = "edysup-parkirpintar-terraform-locks"
     encrypt        = true
   }
@@ -53,7 +53,6 @@ module "networking" {
   project_name       = var.project_name
   environment        = var.environment
   vpc_cidr           = "10.0.0.0/16"
-  single_nat_gateway = true
 }
 
 module "load_balancer" {
@@ -93,11 +92,12 @@ module "mq" {
   project_name           = var.project_name
   environment            = var.environment
   vpc_id                 = module.networking.vpc_id
-  private_subnet_ids     = module.networking.private_subnet_ids
+  private_subnet_ids     = module.networking.public_subnet_ids
   mq_security_group_id   = module.networking.mq_security_group_id
   mq_password            = var.mq_password
   ecs_cluster_id         = module.ecs.cluster_id
   ecs_execution_role_arn = module.ecs.execution_role_arn
+  aws_region             = var.aws_region
 }
 
 module "ecs" {
@@ -105,7 +105,7 @@ module "ecs" {
   project_name             = var.project_name
   environment              = var.environment
   vpc_id                   = module.networking.vpc_id
-  private_subnet_ids       = module.networking.private_subnet_ids
+  private_subnet_ids       = module.networking.public_subnet_ids
   ecs_security_group_id    = module.networking.ecs_security_group_id
   alb_listener_arn         = module.load_balancer.alb_https_listener_arn
   nlb_arn                  = module.load_balancer.nlb_arn
