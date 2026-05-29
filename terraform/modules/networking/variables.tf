@@ -13,11 +13,5 @@ variable "vpc_cidr" {
 
 variable "availability_zones" {
   type    = list(string)
-  default = ["ap-southeast-1a", "ap-southeast-1b"]
-}
-
-variable "single_nat_gateway" {
-  type        = bool
-  default     = false
-  description = "Use single NAT gateway (cost saving for dev)"
+  default = ["ap-southeast-3a", "ap-southeast-3b"]
 }
