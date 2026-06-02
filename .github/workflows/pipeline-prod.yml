@@ -12,7 +12,7 @@ on:
 env:
   AWS_REGION:   ap-southeast-3
   PROJECT_NAME: edysup-parkirpintar
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-3.amazonaws.com
   ENVIRONMENT:  prod
 
 jobs:

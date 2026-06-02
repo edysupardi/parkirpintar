@@ -27,10 +27,18 @@ func NewExtra(db *pgxpool.Pool, rdb *redis.Client, validator *auth.Validator, se
 }
 
 // CreateBookingFeeInvoice creates a booking_fee invoice (pending payment).
-// Called by gateway during reservation flow.
+// Called by gateway during reservation flow. Idempotent — returns existing invoice if key already exists.
 func (h *ExtraHandler) CreateBookingFeeInvoice(ctx context.Context, reservationID, driverID, idempotencyKey string) (invoiceID string, err error) {
-	invoiceID = uuid.New().String()
+	// Check if invoice already exists for this idempotency key (idempotency guard)
+	err = h.db.QueryRow(ctx,
+		`SELECT id FROM invoices WHERE idempotency_key = $1`, idempotencyKey,
+	).Scan(&invoiceID)
+	if err == nil {
+		// already exists — return cached
+		return invoiceID, nil
+	}
 
+	invoiceID = uuid.New().String()
 	_, err = h.db.Exec(ctx, `
 		INSERT INTO invoices (id, type, reservation_id, driver_id, booking_fee, total_amount, status, idempotency_key)
 		VALUES ($1, 'booking_fee', $2, $3, 5000, 5000, 'pending_payment', $4)`,
